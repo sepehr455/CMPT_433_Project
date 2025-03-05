@@ -73,7 +73,6 @@ void GameServer::receiveInput() {
         else if (input == "RIGHT") currentDirection = Direction::RIGHT;
         else currentDirection = Direction::NONE;
 
-        std::cout << "Received direction: " << input << std::endl;
     }
 }
 
