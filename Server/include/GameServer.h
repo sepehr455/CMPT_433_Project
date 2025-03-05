@@ -5,15 +5,8 @@
 #include <string>
 #include <netinet/in.h>
 #include <unistd.h>
+#include "Direction.h"
 
-// Direction enum
-enum class Direction {
-    NONE,
-    UP,
-    DOWN,
-    LEFT,
-    RIGHT
-};
 
 class GameServer {
 private:

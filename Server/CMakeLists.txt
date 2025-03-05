@@ -3,16 +3,40 @@ project(TankBattleServer)
 
 set(CMAKE_CXX_STANDARD 17)
 
+# Find SFML libraries
+find_package(SFML 2.5 COMPONENTS graphics window system REQUIRED)
+
 # Add the executable
 add_executable(TankBattleServer
         main.cpp
         src/GameServer.cpp
+        src/GameRender.cpp
+        src/GameState.cpp
 )
 
 # Include directories
 target_include_directories(TankBattleServer PRIVATE include)
 
-# Custom target to run the server after building
+# Link SFML libraries and pthread
+target_link_libraries(TankBattleServer
+        sfml-graphics
+        sfml-window
+        sfml-system
+        pthread
+)
+
+# -----------------------------------------
+# COPY ASSETS (body.png, turret.png, etc.)
+# -----------------------------------------
+add_custom_command(TARGET TankBattleServer POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/Assets
+        $<TARGET_FILE_DIR:TankBattleServer>/Assets
+        COMMENT "Copying entire Assets folder to build directory"
+)
+
+
+# (Optional) custom run target
 add_custom_target(run
         COMMAND ./TankBattleServer
         DEPENDS TankBattleServer
