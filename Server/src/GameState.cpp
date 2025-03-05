@@ -1,5 +1,5 @@
 #include "../include/GameState.h"
-#include <algorithm>  // For std::max and std::min
+#include <algorithm>
 
 GameState::GameState() {
     tank.x = 512;

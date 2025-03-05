@@ -6,9 +6,8 @@
 GameRender::GameRender()
         : window(sf::VideoMode(1024, 768), "Tank Game")
 {
-    // -------------------------------
-    // Generate a grass-like background
-    // -------------------------------
+
+    // Generate a grass background texture.
     sf::RenderTexture grassRenderTexture;
     if (!grassRenderTexture.create(1024, 768)) {
         std::cerr << "Failed to create render texture for grass background." << std::endl;
@@ -27,7 +26,7 @@ GameRender::GameRender()
         float x = static_cast<float>(std::rand() % 1024);
         float y = static_cast<float>(std::rand() % 768);
         clump.setPosition(x, y);
-        int variation = std::rand() % 30 - 15; // Variation between -15 and +14
+        int variation = std::rand() % 30 - 15;
         sf::Color clumpColor(
                 std::max(0, 50 + variation),
                 std::min(255, 205 + variation),
@@ -41,9 +40,7 @@ GameRender::GameRender()
     backgroundSprite.setTexture(backgroundTexture);
     // (No scaling needed if the texture size matches the window size.)
 
-    // -------------------------------
     // Load the tank body and turret images.
-    // -------------------------------
     if (!bodyTexture.loadFromFile("Assets/body.png")) {
         std::cerr << "Failed to load body.png" << std::endl;
     }
@@ -67,15 +64,15 @@ GameRender::~GameRender() {
 }
 
 void GameRender::run(GameState & state, Direction & currentDir) {
-    // Map Direction enum to an angle in degrees.
-    // (Default: RIGHT = 90°, UP = 0°, DOWN = 180°, LEFT = 270°)
+
+
     auto getAngleForDirection = [](Direction dir) -> float {
         switch (dir) {
             case Direction::UP:    return 0.0f;
             case Direction::RIGHT: return 90.0f;
             case Direction::DOWN:  return 180.0f;
             case Direction::LEFT:  return 270.0f;
-            default: return 90.0f; // Default to RIGHT if NONE.
+            default: return 90.0f;
         }
     };
 
@@ -106,6 +103,7 @@ void GameRender::run(GameState & state, Direction & currentDir) {
         window.draw(turretSprite);
         window.display();
 
-        sf::sleep(sf::milliseconds(16)); // ~60 FPS
+        // ~60 FPS
+        sf::sleep(sf::milliseconds(16));
     }
 }
