@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#define SERVER_IP "192.168.1.100"
+#define SERVER_IP "192.168.6.1"
 #define SERVER_PORT 8080
 
 int main(void) {
