@@ -4,10 +4,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#define SERVER_IP "192.168.1.100"  // Change this to the actual server IP
-#define SERVER_PORT 8080           // Same port as the game server
+#define SERVER_IP "192.168.1.100"
+#define SERVER_PORT 8080
 
-int main() {
+int main(void) {
     // Initialize the joystick
     init_joystick();
 
@@ -21,7 +21,7 @@ int main() {
     // Continuously send joystick data
     while (1) {
         send_joystick_data();
-        usleep(100000); // Sleep for 100ms
+        usleep(100000);
     }
 
     // Cleanup resources
