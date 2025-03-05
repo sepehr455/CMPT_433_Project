@@ -7,6 +7,10 @@
 *.obj
 *.elf
 
+# C++ specific object files
+*.ii
+*.ccache
+
 # Linker output
 *.ilk
 *.map
@@ -15,6 +19,9 @@
 # Precompiled Headers
 *.gch
 *.pch
+
+# C++ specific Precompiled Headers
+*.h.gch
 
 # Libraries
 *.lib
@@ -50,3 +57,35 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# CMake & Build System
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+CMakeLists.txt.user
+
+# Clang & Linter Files
+.clang-format
+.clang-tidy
+
+# IDE-specific files
+.vscode/
+.idea/
+*.code-workspace
+
+# Logs & Temporary files
+*.log
+*.tmp
+*.swp
+*.swo
+*.swn
+*.bak
+
+# Coverage and Profiling
+*.gcda
+*.gcno
+*.gcov
+.profraw
+.profdata
+
