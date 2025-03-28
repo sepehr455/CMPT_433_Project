@@ -2,11 +2,13 @@
 #include <cstring>
 #include <arpa/inet.h>
 #include <thread>
+#include <iostream>
+#include <csignal>
 
-
-// main constructor -> Initializes the server socket and binds it to the specified port.
-GameServer::GameServer(int port) : currentDirection(Direction::NONE) {
-    // Create socket
+GameServer::GameServer(int port) :
+        currentDirection(Direction::NONE),
+        turretRotationDelta(0)
+{
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd == -1) {
         perror("Socket creation failed");
@@ -30,7 +32,7 @@ GameServer::GameServer(int port) : currentDirection(Direction::NONE) {
         exit(EXIT_FAILURE);
     }
 
-    std::cout << "Server started on port " << port << ". Waiting for a client..." << std::endl;
+    std::cout << "Server started on port " << port << std::endl;
 }
 
 GameServer::~GameServer() {
@@ -53,9 +55,18 @@ void GameServer::start() {
     inputThread.detach();
 }
 
-// Reads movement data from the client
+Direction GameServer::getCurrentDirection() const {
+    return currentDirection;
+}
+
+int GameServer::getTurretRotationDelta() {
+    int delta = turretRotationDelta;
+    turretRotationDelta = 0;
+    return delta;
+}
+
 void GameServer::receiveInput() {
-    char buffer[1024];
+    char buffer[32];
 
     while (true) {
         memset(buffer, 0, sizeof(buffer));
@@ -67,16 +78,19 @@ void GameServer::receiveInput() {
         }
 
         std::string input(buffer);
-        if (input == "UP") currentDirection = Direction::UP;
-        else if (input == "DOWN") currentDirection = Direction::DOWN;
-        else if (input == "LEFT") currentDirection = Direction::LEFT;
-        else if (input == "RIGHT") currentDirection = Direction::RIGHT;
-        else currentDirection = Direction::NONE;
 
+        // Debug output
+        std::cout << "Received: " << input << std::endl;
+
+        if (input.find("ROT:") == 0) {
+            turretRotationDelta = std::stoi(input.substr(4));
+        }
+        else {
+            if (input == "UP") currentDirection = Direction::UP;
+            else if (input == "DOWN") currentDirection = Direction::DOWN;
+            else if (input == "LEFT") currentDirection = Direction::LEFT;
+            else if (input == "RIGHT") currentDirection = Direction::RIGHT;
+            else currentDirection = Direction::NONE;
+        }
     }
-}
-
-// Returns the current direction
-Direction GameServer::getCurrentDirection() const {
-    return currentDirection;
 }

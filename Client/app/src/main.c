@@ -1,5 +1,4 @@
-#include "../include/client.h"
-#include "../../hal/include/joystick.h"
+#include "../include/thread_manager.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -8,25 +7,17 @@
 #define SERVER_PORT 8080
 
 int main(void) {
-    // Initialize the joystick
-    init_joystick();
-
-    // Initialize and connect the joystick client to the server
-    if (!init_client(SERVER_IP, SERVER_PORT)) {
-        fprintf(stderr, "Failed to initialize joystick client\n");
-        cleanup_joystick();
+    if (!init_thread_manager(SERVER_IP, SERVER_PORT)) {
+        fprintf(stderr, "Failed to initialize thread manager\n");
         return EXIT_FAILURE;
     }
 
-    // Continuously send joystick data
+    // Keep main thread alive while threads work
     while (1) {
-        send_joystick_data();
-        usleep(100000);
+        sleep(1);
     }
 
-    // Cleanup resources
-    cleanup_client();
-    cleanup_joystick();
-
+    // This will never be reached in current design
+    cleanup_thread_manager();
     return 0;
 }

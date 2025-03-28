@@ -3,10 +3,14 @@
 #include "Direction.h"
 
 class GameState {
-private:
-    Tank tank;
 public:
     GameState();
     void updateTankPosition(Direction dir);
+    void updateTurretRotation(int delta);
     const Tank& getTank() const;
+    float getTurretAngle() const;
+
+private:
+    Tank tank;
+    float turretAngle = 90.0f;
 };

@@ -5,36 +5,44 @@
 #include <thread>
 
 int main() {
-    // Start the TCP server to receive joystick directions.
+    // Start the TCP server
     GameServer server(8080);
     server.start();
 
     GameState gameState;
     GameRender renderer;
 
-    // Use lastDir to hold the last non-NONE direction; default to RIGHT.
-    // We'll use lastDir for rendering orientation.
-    Direction currentDir = Direction::NONE;
+    // Track movement and rotation separately
     Direction lastDir = Direction::RIGHT;
 
-    // Launch the rendering loop in a separate thread.
+    // Launch rendering in separate thread
     std::thread renderThread([&]() {
         renderer.run(gameState, lastDir);
     });
 
-    // Main loop: Update game state only when a new non-NONE direction is received.
+    // Main game loop (~60 FPS)
     while (true) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(16)); // ~60 FPS update rate.
+        auto frameStart = std::chrono::steady_clock::now();
 
-        // Retrieve new direction from the server.
-        currentDir = server.getCurrentDirection();
-
-        // If a new non-NONE direction is received, update both lastDir and the game state.
+        // Handle movement
+        Direction currentDir = server.getCurrentDirection();
         if (currentDir != Direction::NONE) {
             lastDir = currentDir;
             gameState.updateTankPosition(currentDir);
         }
-        // If currentDir is NONE, do nothing so the tank stops moving.
+
+        // Handle turret rotation
+        int rotationDelta = server.getTurretRotationDelta();
+        if (rotationDelta != 0) {
+            gameState.updateTurretRotation(rotationDelta);
+        }
+
+        // Maintain ~60 FPS
+        auto frameEnd = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(frameEnd - frameStart);
+        if (elapsed.count() < 16) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(16 - elapsed.count()));
+        }
     }
 
     renderThread.join();
