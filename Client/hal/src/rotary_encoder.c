@@ -1,13 +1,8 @@
 #include "../include/rotary_encoder.h"
 #include "../include/gpio.h"
-#include <stdatomic.h>
 #include <stdbool.h>
-#include <stdio.h>
-#include <gpiod.h>
 #include <assert.h>
-#include <time.h>
 
-// Choose which GPIO chip and line offsets to open:
 #define ENCODER_CHIP  GPIO_CHIP_2
 #define PIN_A         7
 #define PIN_B         8
@@ -16,12 +11,6 @@
 static struct GpioLine *s_lineA = NULL;
 static struct GpioLine *s_lineB = NULL;
 static struct GpioLine *s_lineButton = NULL;
-
-static atomic_int s_counter = 0;
-static atomic_int s_buttonPressCount = 0;
-
-// Debounce time in milliseconds
-#define DEBOUNCE_TIME_MS 50
 
 // Rotary Encoder State Machine
 typedef void (*ActionFn)(void);
@@ -44,45 +33,20 @@ enum {
 
 static struct state states[NUM_STATES];
 static struct state *pCurrentState = &states[ST_REST];
-
-// Button State Machine
-struct buttonStateEvent {
-    struct buttonState *pNextState;
-    void (*action)(void);
-};
-
-struct buttonState {
-    struct buttonStateEvent rising;
-    struct buttonStateEvent falling;
-};
-
-static struct buttonState buttonStates[] = {
-        { // Not pressed
-                .rising = {&buttonStates[0], NULL},
-                .falling = {&buttonStates[1], NULL},
-        },
-        { // Pressed
-                .rising = {&buttonStates[0], NULL},
-                .falling = {&buttonStates[1], NULL},
-        }
-};
-
-static struct buttonState *pCurrentButtonState = &buttonStates[0];
+static int s_rotationDelta = 0;
+static bool s_buttonPressed = false;
+static bool s_buttonStateChanged = false;
 
 // Transition functions for rotary encoder
 static void onClockwise(void) {
-    atomic_fetch_add(&s_counter, 1);
+    s_rotationDelta++;
 }
 
 static void onCounterClockwise(void) {
-    atomic_fetch_sub(&s_counter, 1);
+    s_rotationDelta--;
 }
 
 static void doNothing(void) {}
-
-static void onButtonPress(void) {
-    atomic_fetch_add(&s_buttonPressCount, 1);
-}
 
 static void initStates(void) {
     // REST state
@@ -108,92 +72,22 @@ static void initStates(void) {
     states[ST_3].a_falling = (struct stateEvent) {&states[ST_2], doNothing};
     states[ST_3].b_rising = (struct stateEvent) {&states[ST_REST], onClockwise};
     states[ST_3].b_falling = (struct stateEvent) {&states[ST_3], doNothing};
-
-    // Button states
-    buttonStates[0].rising.action = NULL;
-    buttonStates[0].falling.action = NULL;
-    buttonStates[1].rising.action = onButtonPress;
-    buttonStates[1].falling.action = NULL;
-}
-
-static void handle_encoder_event(struct gpiod_line_event *event, unsigned int offset) {
-    bool isRising = (event->event_type == GPIOD_LINE_EVENT_RISING_EDGE);
-
-    if (offset == PIN_A) {
-        struct stateEvent *pTrans = isRising ? &pCurrentState->a_rising : &pCurrentState->a_falling;
-        if (pTrans->action) pTrans->action();
-        pCurrentState = pTrans->pNextState;
-    } else if (offset == PIN_B) {
-        struct stateEvent *pTrans = isRising ? &pCurrentState->b_rising : &pCurrentState->b_falling;
-        if (pTrans->action) pTrans->action();
-        pCurrentState = pTrans->pNextState;
-    }
-}
-
-static void handle_button_event(struct gpiod_line_event *event) {
-    bool isRising = (event->event_type == GPIOD_LINE_EVENT_RISING_EDGE);
-    struct buttonStateEvent *pStateEvent = isRising ? &pCurrentButtonState->rising : &pCurrentButtonState->falling;
-
-    if (pStateEvent->action) pStateEvent->action();
-    pCurrentButtonState = pStateEvent->pNextState;
-}
-
-void RotaryEncoder_poll(void) {
-    struct gpiod_line_bulk bulkEvents;
-    gpiod_line_bulk_init(&bulkEvents);
-
-    // Check encoder lines
-    if (s_lineA && s_lineB) {
-        struct gpiod_line_bulk bulkWait;
-        gpiod_line_bulk_init(&bulkWait);
-        gpiod_line_bulk_add(&bulkWait, (struct gpiod_line *)s_lineA);
-        gpiod_line_bulk_add(&bulkWait, (struct gpiod_line *)s_lineB);
-
-        if (gpiod_line_event_wait_bulk(&bulkWait, NULL, &bulkEvents) > 0) {
-            int num = gpiod_line_bulk_num_lines(&bulkEvents);
-            for (int i = 0; i < num; i++) {
-                struct gpiod_line *line = gpiod_line_bulk_get_line(&bulkEvents, i);
-                struct gpiod_line_event event;
-                if (gpiod_line_event_read(line, &event) == 0) {
-                    handle_encoder_event(&event, gpiod_line_offset(line));
-                }
-            }
-        }
-    }
-
-    // Check button line
-    if (s_lineButton) {
-        int numEvents = Gpio_waitForLineChange(s_lineButton, &bulkEvents);
-        if (numEvents > 0) {
-            for (int i = 0; i < numEvents; i++) {
-                struct gpiod_line *line = gpiod_line_bulk_get_line(&bulkEvents, i);
-                struct gpiod_line_event event;
-                if (gpiod_line_event_read(line, &event) == 0) {
-                    handle_button_event(&event);
-
-                    // Debounce delay
-                    struct timespec ts = {0, DEBOUNCE_TIME_MS * 1000000L};
-                    nanosleep(&ts, NULL);
-                }
-            }
-        }
-    }
 }
 
 void RotaryEncoder_init(void) {
     // Build the state table once
     initStates();
     pCurrentState = &states[ST_REST];
-    pCurrentButtonState = &buttonStates[0];
 
-    // Open lines
+    // Open lines for input
     s_lineA = Gpio_openForEvents(ENCODER_CHIP, PIN_A);
     s_lineB = Gpio_openForEvents(ENCODER_CHIP, PIN_B);
     s_lineButton = Gpio_openForEvents(GPIO_CHIP_0, BUTTON_PIN);
 
-    // Initialize atomic counters
-    atomic_store(&s_counter, 0);
-    atomic_store(&s_buttonPressCount, 0);
+    // Initialize state variables
+    s_rotationDelta = 0;
+    s_buttonPressed = false;
+    s_buttonStateChanged = false;
 }
 
 void RotaryEncoder_cleanup(void) {
@@ -211,10 +105,70 @@ void RotaryEncoder_cleanup(void) {
     }
 }
 
-int RotaryEncoder_getFrequency(void) {
-    return atomic_load(&s_counter);
+int RotaryEncoder_readRotation(void) {
+    // We'll use the event-based approach since your GPIO module is optimized for it
+    struct gpiod_line_bulk bulkEvents;
+    int rotation = 0;
+
+    // Check for changes on both A and B lines
+    int numEvents = Gpio_waitForLineChange(s_lineA, &bulkEvents);
+    if (numEvents > 0) {
+        // Process state changes for line A
+        int a_val = gpiod_line_get_value((struct gpiod_line*)s_lineA);
+
+        if (a_val) {
+            if (pCurrentState->a_rising.action) {
+                pCurrentState->a_rising.action();
+            }
+            pCurrentState = pCurrentState->a_rising.pNextState;
+        } else {
+            if (pCurrentState->a_falling.action) {
+                pCurrentState->a_falling.action();
+            }
+            pCurrentState = pCurrentState->a_falling.pNextState;
+        }
+    }
+
+    numEvents = Gpio_waitForLineChange(s_lineB, &bulkEvents);
+    if (numEvents > 0) {
+        // Process state changes for line B
+        int b_val = gpiod_line_get_value((struct gpiod_line*)s_lineB);
+
+        if (b_val) {
+            if (pCurrentState->b_rising.action) {
+                pCurrentState->b_rising.action();
+            }
+            pCurrentState = pCurrentState->b_rising.pNextState;
+        } else {
+            if (pCurrentState->b_falling.action) {
+                pCurrentState->b_falling.action();
+            }
+            pCurrentState = pCurrentState->b_falling.pNextState;
+        }
+    }
+
+    // Return and reset accumulated rotation
+    rotation = s_rotationDelta;
+    s_rotationDelta = 0;
+    return rotation;
 }
 
-int RotaryEncoder_getButtonPressCount(void) {
-    return atomic_load(&s_buttonPressCount);
+bool RotaryEncoder_readButton(void) {
+    struct gpiod_line_bulk bulkEvents;
+    bool buttonPressed = false;
+
+    // Check for button changes
+    int numEvents = Gpio_waitForLineChange(s_lineButton, &bulkEvents);
+    if (numEvents > 0) {
+        int button_val = gpiod_line_get_value((struct gpiod_line*)s_lineButton);
+        bool currentState = (button_val == 0); // Assuming active-low button
+
+        if (currentState && !s_buttonPressed) {
+            buttonPressed = true;
+        }
+
+        s_buttonPressed = currentState;
+    }
+
+    return buttonPressed;
 }

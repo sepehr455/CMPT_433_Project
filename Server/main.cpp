@@ -3,6 +3,7 @@
 #include "include/GameRender.h"
 #include <chrono>
 #include <thread>
+#include <iostream>
 
 int main() {
     // Start the TCP server
@@ -24,17 +25,24 @@ int main() {
     while (true) {
         auto frameStart = std::chrono::steady_clock::now();
 
-        // Handle movement
+        // Get and process input
         Direction currentDir = server.getCurrentDirection();
+        int rotationDelta = server.getTurretRotationDelta();
+
+        // Update tank direction if changed
         if (currentDir != Direction::NONE) {
             lastDir = currentDir;
             gameState.updateTankPosition(currentDir);
         }
 
-        // Handle turret rotation
-        int rotationDelta = server.getTurretRotationDelta();
-        if (rotationDelta != 0) {
-            gameState.updateTurretRotation(rotationDelta);
+        // Always update turret rotation (even if delta is 0)
+        gameState.updateTurretRotation(rotationDelta);
+
+        // Debug output
+        static int counter = 0;
+        if (++counter % 60 == 0) { // Print once per second
+            std::cout << "Turret Angle: " << gameState.getTurretAngle()
+                      << ", Rotation Delta: " << rotationDelta << std::endl;
         }
 
         // Maintain ~60 FPS

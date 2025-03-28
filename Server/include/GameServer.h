@@ -2,6 +2,7 @@
 #include "Direction.h"
 #include <string>
 #include <netinet/in.h>
+#include <atomic>
 
 class GameServer {
 public:
@@ -14,6 +15,7 @@ public:
 
 private:
     void receiveInput();
+    void processInputToken(const std::string& token);
 
     int server_fd;
     int client_fd;
@@ -21,6 +23,7 @@ private:
     sockaddr_in client_addr;
     socklen_t addr_len;
 
-    Direction currentDirection;
-    int turretRotationDelta;
+    // Made these atomic since they're accessed from different threads
+    std::atomic<Direction> currentDirection;
+    std::atomic<int> turretRotationDelta;
 };

@@ -20,18 +20,24 @@ static char s_server_ip[16];
 static int s_server_port;
 
 static JoystickDirection s_current_direction = NO_DIRECTION;
+static int s_rotation_delta = 0;
+static bool s_button_pressed = false;
 static pthread_mutex_t s_data_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static void* input_thread_func(void* arg) {
     (void)arg;
 
     while (s_running) {
-        // Read joystick
+        // Read all input devices
         JoystickOutput joystick = read_joystick();
+        int rotation = RotaryEncoder_readRotation();
+        bool button = RotaryEncoder_readButton();
 
         // Update direction
         pthread_mutex_lock(&s_data_mutex);
         s_current_direction = joystick.direction;
+        s_rotation_delta = rotation;
+        s_button_pressed = button;
         pthread_mutex_unlock(&s_data_mutex);
 
         usleep(20000); // 20ms (50Hz update rate)
@@ -46,13 +52,17 @@ static void* transmit_thread_func(void* arg) {
     while (s_running) {
         if (s_client_connected) {
             JoystickDirection current_dir;
-            char buffer[16];
+            int rotation_delta;
+            bool button_pressed;
+            char buffer[32];
             int retry_count = 0;
             bool send_success = false;
 
-            // Get current direction
+            // Get current state
             pthread_mutex_lock(&s_data_mutex);
             current_dir = s_current_direction;
+            rotation_delta = s_rotation_delta;
+            button_pressed = s_button_pressed;
             pthread_mutex_unlock(&s_data_mutex);
 
             // Format data
@@ -62,6 +72,18 @@ static void* transmit_thread_func(void* arg) {
                 case LEFT:  strcpy(buffer, "LEFT"); break;
                 case RIGHT: strcpy(buffer, "RIGHT"); break;
                 default:    strcpy(buffer, "NONE"); break;
+            }
+
+            // Add rotation data if any
+            if (rotation_delta != 0) {
+                char rot_buf[16];
+                snprintf(rot_buf, sizeof(rot_buf), ",ROT:%d", rotation_delta);
+                strcat(buffer, rot_buf);
+            }
+
+            // Add button data if pressed
+            if (button_pressed) {
+                strcat(buffer, ",BTN:1");
             }
 
             // Try sending with retries

@@ -78,19 +78,36 @@ void GameServer::receiveInput() {
         }
 
         std::string input(buffer);
-
-        // Debug output
         std::cout << "Received: " << input << std::endl;
 
-        if (input.find("ROT:") == 0) {
-            turretRotationDelta = std::stoi(input.substr(4));
+        // Reset direction first
+        currentDirection = Direction::NONE;
+
+        // Parse comma-separated commands
+        size_t pos = 0;
+        std::string token;
+        while ((pos = input.find(',')) != std::string::npos) {
+            token = input.substr(0, pos);
+
+            if (token == "UP") currentDirection = Direction::UP;
+            else if (token == "DOWN") currentDirection = Direction::DOWN;
+            else if (token == "LEFT") currentDirection = Direction::LEFT;
+            else if (token == "RIGHT") currentDirection = Direction::RIGHT;
+            else if (token.find("ROT:") == 0) {
+                turretRotationDelta += std::stoi(token.substr(4)); // Accumulate rotation
+            }
+
+            input.erase(0, pos + 1);
         }
-        else {
-            if (input == "UP") currentDirection = Direction::UP;
-            else if (input == "DOWN") currentDirection = Direction::DOWN;
-            else if (input == "LEFT") currentDirection = Direction::LEFT;
-            else if (input == "RIGHT") currentDirection = Direction::RIGHT;
-            else currentDirection = Direction::NONE;
+
+        // Handle last token
+        token = input;
+        if (token == "UP") currentDirection = Direction::UP;
+        else if (token == "DOWN") currentDirection = Direction::DOWN;
+        else if (token == "LEFT") currentDirection = Direction::LEFT;
+        else if (token == "RIGHT") currentDirection = Direction::RIGHT;
+        else if (token.find("ROT:") == 0) {
+            turretRotationDelta += std::stoi(token.substr(4));
         }
     }
 }

@@ -64,18 +64,6 @@ GameRender::~GameRender() {
 }
 
 void GameRender::run(GameState & state, Direction & currentDir) {
-
-
-    auto getAngleForDirection = [](Direction dir) -> float {
-        switch (dir) {
-            case Direction::UP:    return 0.0f;
-            case Direction::RIGHT: return 90.0f;
-            case Direction::DOWN:  return 180.0f;
-            case Direction::LEFT:  return 270.0f;
-            default: return 90.0f;
-        }
-    };
-
     while (window.isOpen()) {
         // Handle window events.
         sf::Event event;
@@ -93,12 +81,22 @@ void GameRender::run(GameState & state, Direction & currentDir) {
         bodySprite.setPosition(static_cast<float>(tank.x), static_cast<float>(tank.y));
         turretSprite.setPosition(static_cast<float>(tank.x), static_cast<float>(tank.y));
 
-        // Update rotation based on the current (or last known) direction.
-        float angle = getAngleForDirection(currentDir);
-        bodySprite.setRotation(angle);
-        turretSprite.setRotation(angle);
+        // Set tank body rotation based on direction
+        auto getAngleForDirection = [](Direction dir) -> float {
+            switch (dir) {
+                case Direction::UP:    return 0.0f;
+                case Direction::RIGHT: return 90.0f;
+                case Direction::DOWN:  return 180.0f;
+                case Direction::LEFT:  return 270.0f;
+                default: return 90.0f; // Default to facing right
+            }
+        };
+        bodySprite.setRotation(getAngleForDirection(currentDir));
 
-        // Draw the tank on top of the background.
+        // Set turret rotation based on GameState's turret angle
+        turretSprite.setRotation(state.getTurretAngle());
+
+        // Draw the tank
         window.draw(bodySprite);
         window.draw(turretSprite);
         window.display();
