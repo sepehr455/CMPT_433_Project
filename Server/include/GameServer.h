@@ -12,6 +12,7 @@ public:
     void start();
     Direction getCurrentDirection() const;
     int getTurretRotationDelta();
+    bool getButtonPressed();
 
 private:
     void receiveInput();
@@ -23,7 +24,7 @@ private:
     sockaddr_in client_addr;
     socklen_t addr_len;
 
-    // Made these atomic since they're accessed from different threads
     std::atomic<Direction> currentDirection;
     std::atomic<int> turretRotationDelta;
+    std::atomic<bool> buttonPressed;
 };

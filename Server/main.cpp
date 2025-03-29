@@ -25,27 +25,20 @@ int main() {
     while (true) {
         auto frameStart = std::chrono::steady_clock::now();
 
-        // Get and process input
         Direction currentDir = server.getCurrentDirection();
-        int rotationDelta = server.getTurretRotationDelta();
-
-        // Update tank direction if changed
         if (currentDir != Direction::NONE) {
             lastDir = currentDir;
             gameState.updateTankPosition(currentDir);
         }
 
-        // Always update turret rotation (even if delta is 0)
-        gameState.updateTurretRotation(rotationDelta);
+        gameState.updateTurretRotation(server.getTurretRotationDelta());
 
-        // Debug output
-        static int counter = 0;
-        if (++counter % 60 == 0) { // Print once per second
-            std::cout << "Turret Angle: " << gameState.getTurretAngle()
-                      << ", Rotation Delta: " << rotationDelta << std::endl;
+        if (server.getButtonPressed()) {
+            gameState.fireProjectile();
         }
 
-        // Maintain ~60 FPS
+        gameState.updateProjectiles();
+
         auto frameEnd = std::chrono::steady_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(frameEnd - frameStart);
         if (elapsed.count() < 16) {

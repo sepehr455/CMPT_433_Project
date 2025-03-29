@@ -57,13 +57,15 @@ GameRender::GameRender()
     // Scale the images up 4× compared to the previous size.
     bodySprite.setScale(0.20f, 0.20f);
     turretSprite.setScale(0.20f, 0.20f);
+
+
+    // Projectile shape
+    projectileShape.setRadius(5.f);
+    projectileShape.setFillColor(sf::Color::Red);
+    projectileShape.setOrigin(2.5f, 2.5f);
 }
 
-GameRender::~GameRender() {
-    window.close();
-}
-
-void GameRender::run(GameState & state, Direction & currentDir) {
+void GameRender::run(GameState& state, Direction& lastDir) {
     while (window.isOpen()) {
         // Handle window events.
         sf::Event event;
@@ -76,32 +78,37 @@ void GameRender::run(GameState & state, Direction & currentDir) {
         window.clear();
         window.draw(backgroundSprite);
 
-        // Update sprite positions from the current game state.
-        const Tank & tank = state.getTank();
-        bodySprite.setPosition(static_cast<float>(tank.x), static_cast<float>(tank.y));
-        turretSprite.setPosition(static_cast<float>(tank.x), static_cast<float>(tank.y));
+        const Tank& tank = state.getTank();
+        bodySprite.setPosition(tank.x, tank.y);
+        turretSprite.setPosition(tank.x, tank.y);
 
-        // Set tank body rotation based on direction
+
         auto getAngleForDirection = [](Direction dir) -> float {
             switch (dir) {
-                case Direction::UP:    return 0.0f;
+                case Direction::UP: return 0.0f;
                 case Direction::RIGHT: return 90.0f;
-                case Direction::DOWN:  return 180.0f;
-                case Direction::LEFT:  return 270.0f;
-                default: return 90.0f; // Default to facing right
+                case Direction::DOWN: return 180.0f;
+                case Direction::LEFT: return 270.0f;
+                default: return 90.0f;
             }
         };
-        bodySprite.setRotation(getAngleForDirection(currentDir));
 
-        // Set turret rotation based on GameState's turret angle
+        bodySprite.setRotation(getAngleForDirection(lastDir));
         turretSprite.setRotation(state.getTurretAngle());
 
-        // Draw the tank
+        // Draw projectiles
+        for (const auto& p : state.getProjectiles()) {
+            projectileShape.setPosition(p.x, p.y);
+            window.draw(projectileShape);
+        }
+
         window.draw(bodySprite);
         window.draw(turretSprite);
         window.display();
-
-        // ~60 FPS
         sf::sleep(sf::milliseconds(16));
     }
+}
+
+GameRender::~GameRender() {
+    window.close();
 }
