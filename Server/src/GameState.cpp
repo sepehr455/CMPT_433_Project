@@ -1,12 +1,15 @@
 #include "../include/GameState.h"
 #include <algorithm>
 #include <cmath>
+#include <ctime>
 
-GameState::GameState() {
-    tank.x = 512;
-    tank.y = 384;
-    tank.speed = 10;
-    turretAngle = 90.0f;
+GameState::GameState()
+        : tank{512, 384, 10, 100},
+          turretAngle(90.0f),
+          rng(std::time(nullptr)),
+          xDist(100.0f, 924.0f),
+          yDist(100.0f, 668.0f) {
+    spawnEnemy();
 }
 
 void GameState::updateTankPosition(Direction dir) {
@@ -27,13 +30,12 @@ void GameState::updateTurretRotation(int delta) {
     if (turretAngle < 0) turretAngle += 360.0f;
 }
 
-
 void GameState::fireProjectile() {
     Projectile p;
     p.x = tank.x;
     p.y = tank.y;
     p.angle = turretAngle;
-    p.speed = 15.0f;  // Projectile speed
+    p.speed = 15.0f;
     projectiles.push_back(p);
 }
 
@@ -41,9 +43,7 @@ void GameState::updateProjectiles() {
     const float pi = 3.14159265f;
 
     for (auto& p : projectiles) {
-        // Convert to radians and adjust for SFML's coordinate system
-        // (0° = up, 90° = right in SFML, while our turret uses 0° = right)
-        float radians = (p.angle - 90) * pi / 180.0f;  // Subtract 90 degrees
+        float radians = (p.angle - 90) * pi / 180.0f;
         p.x += p.speed * cos(radians);
         p.y += p.speed * sin(radians);
     }
@@ -54,6 +54,46 @@ void GameState::updateProjectiles() {
                                return p.x < 0 || p.x > 1024 || p.y < 0 || p.y > 768;
                            }),
             projectiles.end());
+
+    checkProjectileCollisions();
+}
+
+void GameState::spawnEnemy() {
+    float x = xDist(rng);
+    float y = yDist(rng);
+    enemies.push_back(std::make_unique<Enemy>(x, y));
+}
+
+void GameState::checkProjectileCollisions() {
+    for (auto it = projectiles.begin(); it != projectiles.end(); ) {
+        bool hit = false;
+        for (auto& enemy : enemies) {
+            if (enemy->isActive()) {
+                float dx = it->x - enemy->getPosition().x;
+                float dy = it->y - enemy->getPosition().y;
+                float distance = std::sqrt(dx * dx + dy * dy);
+                if (distance < enemy->getRadius()) {
+                    enemy->hit();
+                    hit = true;
+                    spawnEnemy();
+                    break;
+                }
+            }
+        }
+        if (hit) {
+            it = projectiles.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    // Remove dead enemies
+    enemies.erase(
+            std::remove_if(enemies.begin(), enemies.end(),
+                           [](const std::unique_ptr<Enemy>& e) {
+                               return !e->isActive() && !e->isSpawning();
+                           }),
+            enemies.end());
 }
 
 const Tank& GameState::getTank() const {
@@ -66,4 +106,8 @@ float GameState::getTurretAngle() const {
 
 const std::vector<Projectile>& GameState::getProjectiles() const {
     return projectiles;
+}
+
+const std::vector<std::unique_ptr<Enemy>>& GameState::getEnemies() const {
+    return enemies;
 }

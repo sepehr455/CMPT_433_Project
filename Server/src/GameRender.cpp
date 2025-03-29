@@ -4,8 +4,7 @@
 #include <ctime>
 
 GameRender::GameRender()
-        : window(sf::VideoMode(1024, 768), "Tank Game")
-{
+        : window(sf::VideoMode(1024, 768), "Tank Game") {
 
     // Generate a grass background texture.
     sf::RenderTexture grassRenderTexture;
@@ -13,7 +12,7 @@ GameRender::GameRender()
         std::cerr << "Failed to create render texture for grass background." << std::endl;
     }
     // Base green color for grass.
-    grassRenderTexture.clear(sf::Color(50, 205, 50)); // a lime-green tone
+    grassRenderTexture.clear(sf::Color(50, 205, 50));
 
     // Seed random generator.
     std::srand(static_cast<unsigned int>(std::time(nullptr)));
@@ -38,7 +37,6 @@ GameRender::GameRender()
     grassRenderTexture.display();
     backgroundTexture = grassRenderTexture.getTexture();
     backgroundSprite.setTexture(backgroundTexture);
-    // (No scaling needed if the texture size matches the window size.)
 
     // Load the tank body and turret images.
     if (!bodyTexture.loadFromFile("Assets/body.png")) {
@@ -58,7 +56,6 @@ GameRender::GameRender()
     bodySprite.setScale(0.20f, 0.20f);
     turretSprite.setScale(0.20f, 0.20f);
 
-
     // Projectile shape
     projectileShape.setRadius(5.f);
     projectileShape.setFillColor(sf::Color::Red);
@@ -67,12 +64,17 @@ GameRender::GameRender()
 
 void GameRender::run(GameState& state, Direction& lastDir) {
     while (window.isOpen()) {
+        float dt = deltaClock.restart().asSeconds();
+
         // Handle window events.
         sf::Event event;
         while (window.pollEvent(event)) {
             if (event.type == sf::Event::Closed)
                 window.close();
         }
+
+        // Update game state
+        state.updateProjectiles();
 
         // Draw the grass background.
         window.clear();
@@ -81,7 +83,6 @@ void GameRender::run(GameState& state, Direction& lastDir) {
         const Tank& tank = state.getTank();
         bodySprite.setPosition(tank.x, tank.y);
         turretSprite.setPosition(tank.x, tank.y);
-
 
         auto getAngleForDirection = [](Direction dir) -> float {
             switch (dir) {
@@ -100,6 +101,12 @@ void GameRender::run(GameState& state, Direction& lastDir) {
         for (const auto& p : state.getProjectiles()) {
             projectileShape.setPosition(p.x, p.y);
             window.draw(projectileShape);
+        }
+
+        // Draw enemies
+        for (const auto& enemy : state.getEnemies()) {
+            enemy->update(dt);
+            enemy->draw(window);
         }
 
         window.draw(bodySprite);

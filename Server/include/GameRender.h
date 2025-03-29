@@ -20,6 +20,6 @@ private:
     sf::Sprite bodySprite;
     sf::Sprite turretSprite;
 
-
     sf::CircleShape projectileShape;
+    sf::Clock deltaClock;
 };

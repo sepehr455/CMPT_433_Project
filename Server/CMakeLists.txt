@@ -12,6 +12,7 @@ add_executable(TankBattleServer
         src/GameServer.cpp
         src/GameRender.cpp
         src/GameState.cpp
+        src/Enemy.cpp
 )
 
 # Include directories
@@ -25,9 +26,7 @@ target_link_libraries(TankBattleServer
         pthread
 )
 
-# -----------------------------------------
-# COPY ASSETS (body.png, turret.png, etc.)
-# -----------------------------------------
+# Copy Assets (body.png, turret.png, etc.)
 add_custom_command(TARGET TankBattleServer POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_SOURCE_DIR}/Assets
