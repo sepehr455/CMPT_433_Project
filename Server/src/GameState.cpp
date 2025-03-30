@@ -28,7 +28,7 @@ void GameState::updateTankPosition(Direction dir) {
 
 void GameState::updateTurretRotation(int delta) {
     std::lock_guard<std::recursive_mutex> lock(mtx);
-    turretAngle += delta * 2.0f;
+    turretAngle += delta * 10.0f;
     turretAngle = fmod(turretAngle, 360.0f);
     if (turretAngle < 0) turretAngle += 360.0f;
 }
