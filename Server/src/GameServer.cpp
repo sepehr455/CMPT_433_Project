@@ -6,9 +6,9 @@
 #include <csignal>
 
 GameServer::GameServer(int port) :
-    currentDirection(Direction::NONE),
-    turretRotationDelta(0),
-    buttonPressed(false)
+        currentDirection(Direction::NONE),
+        turretRotationDelta(0),
+        buttonPressed(false)
 {
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd == -1) {
@@ -40,7 +40,6 @@ GameServer::~GameServer() {
     close(server_fd);
 }
 
-// Accepts a client connection
 void GameServer::start() {
     client_fd = accept(server_fd, (struct sockaddr*)&client_addr, &addr_len);
     if (client_fd < 0) {
@@ -65,9 +64,18 @@ int GameServer::getTurretRotationDelta() {
     return delta;
 }
 
+bool GameServer::getButtonPressed() {
+    bool pressed = buttonPressed;
+    buttonPressed = false;
+    return pressed;
+}
+
 void GameServer::receiveInput() {
     char buffer[32];
 
+    // Send initial state request
+    const char* init_request = "INIT";
+    write(client_fd, init_request, strlen(init_request));
 
     while (true) {
         memset(buffer, 0, sizeof(buffer));
@@ -79,10 +87,13 @@ void GameServer::receiveInput() {
         }
 
         std::string input(buffer);
-        std::cout << "Received: " << input << std::endl;
 
-        // Reset direction first
+        // Reset state
         currentDirection = Direction::NONE;
+        turretRotationDelta = 0;
+        buttonPressed = false;
+
+        // Process input
         size_t start = 0;
         size_t end = input.find(',');
 
@@ -106,10 +117,4 @@ void GameServer::processInputToken(const std::string& token) {
     else if (token.find("BTN:") == 0) {
         buttonPressed = (token.substr(4) == "1");
     }
-}
-
-bool GameServer::getButtonPressed() {
-    bool pressed = buttonPressed;
-    buttonPressed = false;
-    return pressed;
 }

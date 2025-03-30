@@ -25,15 +25,24 @@ int main() {
     while (true) {
         auto frameStart = std::chrono::steady_clock::now();
 
+        // Get all inputs at once
         Direction currentDir = server.getCurrentDirection();
+        int rotationDelta = server.getTurretRotationDelta();
+        bool buttonPressed = server.getButtonPressed();
+
+        // Update tank if direction changed
         if (currentDir != Direction::NONE) {
             lastDir = currentDir;
             gameState.updateTankPosition(currentDir);
         }
 
-        gameState.updateTurretRotation(server.getTurretRotationDelta());
+        // Update turret if rotation changed
+        if (rotationDelta != 0) {
+            gameState.updateTurretRotation(rotationDelta);
+        }
 
-        if (server.getButtonPressed()) {
+        // Fire if button pressed
+        if (buttonPressed) {
             gameState.fireProjectile();
         }
 

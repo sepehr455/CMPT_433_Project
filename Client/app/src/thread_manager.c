@@ -24,6 +24,23 @@ static int s_rotation_delta = 0;
 static bool s_button_pressed = false;
 static pthread_mutex_t s_data_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+static void send_initial_state(int sock_fd) {
+    char buffer[32] = "NONE";
+
+    pthread_mutex_lock(&s_data_mutex);
+    if (s_rotation_delta != 0) {
+        char rot_buf[16];
+        snprintf(rot_buf, sizeof(rot_buf), ",ROT:%d", s_rotation_delta);
+        strcat(buffer, rot_buf);
+    }
+    if (s_button_pressed) {
+        strcat(buffer, ",BTN:1");
+    }
+    pthread_mutex_unlock(&s_data_mutex);
+
+    send(sock_fd, buffer, strlen(buffer), MSG_NOSIGNAL);
+}
+
 static void* input_thread_func(void* arg) {
     (void)arg;
 
@@ -63,6 +80,7 @@ static void* transmit_thread_func(void* arg) {
             current_dir = s_current_direction;
             rotation_delta = s_rotation_delta;
             button_pressed = s_button_pressed;
+            s_rotation_delta = 0;
             pthread_mutex_unlock(&s_data_mutex);
 
             // Format data
@@ -104,6 +122,7 @@ static void* transmit_thread_func(void* arg) {
             // Attempt to reconnect using stored IP/port
             if (init_client(s_server_ip, s_server_port)) {
                 s_client_connected = true;
+                send_initial_state(get_client_socket_fd());
             } else {
                 usleep(100000); // Wait 100ms before next reconnect attempt
             }
@@ -128,6 +147,9 @@ bool init_thread_manager(const char* server_ip, int port) {
 
     // Initialize client connection
     s_client_connected = init_client(s_server_ip, s_server_port);
+    if (s_client_connected) {
+        send_initial_state(get_client_socket_fd());
+    }
 
     // Start threads
     s_running = true;
