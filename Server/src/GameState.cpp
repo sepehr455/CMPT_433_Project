@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <ctime>
+#include <mutex>
 
 GameState::GameState()
         : tank{512, 384, 10, 100},
@@ -13,6 +14,7 @@ GameState::GameState()
 }
 
 void GameState::updateTankPosition(Direction dir) {
+    std::lock_guard<std::recursive_mutex> lock(mtx);
     switch (dir) {
         case Direction::UP:    tank.y -= tank.speed; break;
         case Direction::DOWN:  tank.y += tank.speed; break;
@@ -25,12 +27,14 @@ void GameState::updateTankPosition(Direction dir) {
 }
 
 void GameState::updateTurretRotation(int delta) {
+    std::lock_guard<std::recursive_mutex> lock(mtx);
     turretAngle += delta * 2.0f;
     turretAngle = fmod(turretAngle, 360.0f);
     if (turretAngle < 0) turretAngle += 360.0f;
 }
 
 void GameState::fireProjectile() {
+    std::lock_guard<std::recursive_mutex> lock(mtx);
     Projectile p;
     p.x = tank.x;
     p.y = tank.y;
@@ -40,6 +44,7 @@ void GameState::fireProjectile() {
 }
 
 void GameState::updateProjectiles() {
+    std::lock_guard<std::recursive_mutex> lock(mtx);
     const float pi = 3.14159265f;
 
     for (auto& p : projectiles) {
@@ -59,12 +64,14 @@ void GameState::updateProjectiles() {
 }
 
 void GameState::spawnEnemy() {
+    std::lock_guard<std::recursive_mutex> lock(mtx);
     float x = xDist(rng);
     float y = yDist(rng);
     enemies.push_back(std::make_unique<Enemy>(x, y));
 }
 
 void GameState::checkProjectileCollisions() {
+    std::lock_guard<std::recursive_mutex> lock(mtx);
     for (auto it = projectiles.begin(); it != projectiles.end(); ) {
         bool hit = false;
         for (auto& enemy : enemies) {

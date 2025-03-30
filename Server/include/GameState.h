@@ -6,6 +6,7 @@
 #include <cmath>
 #include <memory>
 #include <random>
+#include <mutex>  // Added for thread safety
 
 struct Projectile {
     float x, y;
@@ -28,6 +29,9 @@ public:
     const std::vector<Projectile>& getProjectiles() const;
     const std::vector<std::unique_ptr<Enemy>>& getEnemies() const;
 
+    // Provide access to the mutex for external locking.
+    std::recursive_mutex& getMutex() { return mtx; }
+
 private:
     Tank tank;
     float turretAngle;
@@ -36,4 +40,5 @@ private:
     std::mt19937 rng;
     std::uniform_real_distribution<float> xDist;
     std::uniform_real_distribution<float> yDist;
+    mutable std::recursive_mutex mtx;  // New mutex member
 };

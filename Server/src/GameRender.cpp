@@ -2,6 +2,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <ctime>
+#include <mutex>
 
 GameRender::GameRender()
         : window(sf::VideoMode(1024, 768), "Tank Game") {
@@ -62,7 +63,7 @@ GameRender::GameRender()
     projectileShape.setOrigin(2.5f, 2.5f);
 }
 
-void GameRender::run(GameState& state, Direction& lastDir) {
+void GameRender::run(GameState &state, Direction &lastDir) {
     while (window.isOpen()) {
         float dt = deltaClock.restart().asSeconds();
 
@@ -73,40 +74,47 @@ void GameRender::run(GameState& state, Direction& lastDir) {
                 window.close();
         }
 
-        // Update game state
-        state.updateProjectiles();
-
         // Draw the grass background.
         window.clear();
         window.draw(backgroundSprite);
 
-        const Tank& tank = state.getTank();
-        bodySprite.setPosition(tank.x, tank.y);
-        turretSprite.setPosition(tank.x, tank.y);
+        {
+            // Lock the game state during update and drawing.
+            std::lock_guard<std::recursive_mutex> lock(state.getMutex());
 
-        auto getAngleForDirection = [](Direction dir) -> float {
-            switch (dir) {
-                case Direction::UP: return 0.0f;
-                case Direction::RIGHT: return 90.0f;
-                case Direction::DOWN: return 180.0f;
-                case Direction::LEFT: return 270.0f;
-                default: return 90.0f;
+            const Tank &tank = state.getTank();
+            bodySprite.setPosition(tank.x, tank.y);
+            turretSprite.setPosition(tank.x, tank.y);
+
+            auto getAngleForDirection = [](Direction dir) -> float {
+                switch (dir) {
+                    case Direction::UP:
+                        return 0.0f;
+                    case Direction::RIGHT:
+                        return 90.0f;
+                    case Direction::DOWN:
+                        return 180.0f;
+                    case Direction::LEFT:
+                        return 270.0f;
+                    default:
+                        return 90.0f;
+                }
+            };
+
+            bodySprite.setRotation(getAngleForDirection(lastDir));
+            turretSprite.setRotation(state.getTurretAngle());
+
+            // Draw projectiles.
+            for (const auto &p: state.getProjectiles()) {
+                projectileShape.setPosition(p.x, p.y);
+                window.draw(projectileShape);
             }
-        };
 
-        bodySprite.setRotation(getAngleForDirection(lastDir));
-        turretSprite.setRotation(state.getTurretAngle());
-
-        // Draw projectiles
-        for (const auto& p : state.getProjectiles()) {
-            projectileShape.setPosition(p.x, p.y);
-            window.draw(projectileShape);
-        }
-
-        // Draw enemies
-        for (const auto& enemy : state.getEnemies()) {
-            enemy->update(dt);
-            enemy->draw(window);
+            // Update and draw enemies.
+            for (const auto &enemy: state.getEnemies()) {
+                enemy->update(dt);
+                enemy->draw(window);
+            }
         }
 
         window.draw(bodySprite);
