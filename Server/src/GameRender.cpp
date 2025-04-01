@@ -61,6 +61,11 @@ GameRender::GameRender()
     projectileShape.setRadius(5.f);
     projectileShape.setFillColor(sf::Color::Red);
     projectileShape.setOrigin(2.5f, 2.5f);
+
+    // Hit effect
+    hitEffect.setSize(sf::Vector2f(50, 50));
+    hitEffect.setFillColor(sf::Color(255, 0, 0, 150));
+    hitEffect.setOrigin(25, 25);
 }
 
 void GameRender::run(GameState &state, Direction &lastDir) {
@@ -82,31 +87,44 @@ void GameRender::run(GameState &state, Direction &lastDir) {
             // Lock the game state during update and drawing.
             std::lock_guard<std::recursive_mutex> lock(state.getMutex());
 
-            const Tank &tank = state.getTank();
-            bodySprite.setPosition(tank.x, tank.y);
-            turretSprite.setPosition(tank.x, tank.y);
+            // Only draw tank if player is alive
+            if (state.isPlayerAlive()) {
+                const Tank &tank = state.getTank();
+                bodySprite.setPosition(tank.x, tank.y);
+                turretSprite.setPosition(tank.x, tank.y);
 
-            auto getAngleForDirection = [](Direction dir) -> float {
-                switch (dir) {
-                    case Direction::UP:
-                        return 0.0f;
-                    case Direction::RIGHT:
-                        return 90.0f;
-                    case Direction::DOWN:
-                        return 180.0f;
-                    case Direction::LEFT:
-                        return 270.0f;
-                    default:
-                        return 90.0f;
+                auto getAngleForDirection = [](Direction dir) -> float {
+                    switch (dir) {
+                        case Direction::UP:
+                            return 0.0f;
+                        case Direction::RIGHT:
+                            return 90.0f;
+                        case Direction::DOWN:
+                            return 180.0f;
+                        case Direction::LEFT:
+                            return 270.0f;
+                        default:
+                            return 90.0f;
+                    }
+                };
+
+                bodySprite.setRotation(getAngleForDirection(lastDir));
+                turretSprite.setRotation(state.getTurretAngle());
+
+                // Draw hit effect if active
+                if (state.getTankHitEffect() > 0) {
+                    hitEffect.setPosition(tank.x, tank.y);
+                    window.draw(hitEffect);
                 }
-            };
 
-            bodySprite.setRotation(getAngleForDirection(lastDir));
-            turretSprite.setRotation(state.getTurretAngle());
+                window.draw(bodySprite);
+                window.draw(turretSprite);
+            }
 
             // Draw projectiles.
             for (const auto &p: state.getProjectiles()) {
                 projectileShape.setPosition(p.x, p.y);
+                projectileShape.setFillColor(p.isEnemyProjectile ? sf::Color::Yellow : sf::Color::Red);
                 window.draw(projectileShape);
             }
 
@@ -117,8 +135,6 @@ void GameRender::run(GameState &state, Direction &lastDir) {
             }
         }
 
-        window.draw(bodySprite);
-        window.draw(turretSprite);
         window.display();
         sf::sleep(sf::milliseconds(16));
     }

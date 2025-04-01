@@ -1,8 +1,15 @@
 #include "../include/Enemy.h"
 #include <iostream>
+#include <random>
 
 Enemy::Enemy(float x, float y)
-        : position(x, y), spawnTimer(0.0f), active(false), spawning(true) {
+        : position(x, y), spawnTimer(0.0f), active(false), spawning(true),
+          shootTimer(0.0f) {
+    // Random direction
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dirDist(1, 4);
+    direction = static_cast<Direction>(dirDist(gen));
 
     if (!texture.loadFromFile("Assets/enemy.png")) {
         std::cerr << "Failed to load enemy.png" << std::endl;
@@ -26,6 +33,8 @@ void Enemy::update(float dt) {
             spawning = false;
             active = true;
         }
+    } else if (active) {
+        shootTimer += dt;
     }
 }
 
@@ -33,7 +42,16 @@ void Enemy::draw(sf::RenderWindow& window) const {
     if (spawning) {
         window.draw(spawnIndicator);
     } else if (active) {
-        window.draw(sprite);
+        // Draw enemy with correct rotation based on direction
+        sf::Sprite tempSprite = sprite;
+        switch (direction) {
+            case Direction::UP: tempSprite.setRotation(0); break;
+            case Direction::RIGHT: tempSprite.setRotation(90); break;
+            case Direction::DOWN: tempSprite.setRotation(180); break;
+            case Direction::LEFT: tempSprite.setRotation(270); break;
+            default: break;
+        }
+        window.draw(tempSprite);
     }
 }
 
@@ -56,4 +74,16 @@ sf::Vector2f Enemy::getPosition() const {
 
 float Enemy::getRadius() const {
     return RADIUS;
+}
+
+Direction Enemy::getDirection() const {
+    return direction;
+}
+
+bool Enemy::canShoot() const {
+    return active && shootTimer >= SHOOT_COOLDOWN;
+}
+
+void Enemy::resetShootTimer() {
+    shootTimer = 0.0f;
 }

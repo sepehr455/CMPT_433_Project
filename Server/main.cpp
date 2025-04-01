@@ -51,6 +51,26 @@ int main() {
                 gameState.fireProjectile();
             }
 
+            // Handle enemy shooting
+            for (const auto& enemy : gameState.getEnemies()) {
+                if (enemy->canShoot() && enemy->isActive()) {
+                    float angle;
+                    switch (enemy->getDirection()) {
+                        case Direction::UP: angle = 0.0f; break;
+                        case Direction::RIGHT: angle = 90.0f; break;
+                        case Direction::DOWN: angle = 180.0f; break;
+                        case Direction::LEFT: angle = 270.0f; break;
+                        default: angle = 0.0f; break;
+                    }
+                    gameState.enemyFireProjectile(
+                        enemy->getPosition().x,
+                        enemy->getPosition().y,
+                        angle
+                    );
+                    enemy->resetShootTimer();
+                }
+            }
+
             gameState.updateProjectiles();
         }
 

@@ -22,4 +22,5 @@ private:
 
     sf::CircleShape projectileShape;
     sf::Clock deltaClock;
+    sf::RectangleShape hitEffect;
 };

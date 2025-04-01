@@ -1,5 +1,6 @@
 #pragma once
 #include <SFML/Graphics.hpp>
+#include "Direction.h"
 
 class Enemy {
 public:
@@ -11,6 +12,9 @@ public:
     void hit();
     sf::Vector2f getPosition() const;
     float getRadius() const;
+    Direction getDirection() const;
+    bool canShoot() const;
+    void resetShootTimer();
 
 private:
     sf::Vector2f position;
@@ -20,6 +24,9 @@ private:
     float spawnTimer;
     bool active;
     bool spawning;
+    Direction direction;
+    float shootTimer;
     static constexpr float SPAWN_TIME = 3.0f;
     static constexpr float RADIUS = 20.0f;
+    static constexpr float SHOOT_COOLDOWN = 3.0f;
 };
