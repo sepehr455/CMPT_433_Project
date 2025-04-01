@@ -20,5 +20,6 @@ int RotaryEncoder_readRotation(void);
 
 // Get the button press state (call this periodically)
 bool RotaryEncoder_readButton(void);
+void RotaryEncoder_processEvents(void);  // New function for event processing
 
 #endif // _ROTARY_ENCODER_H_

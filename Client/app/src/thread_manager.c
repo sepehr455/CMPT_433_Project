@@ -10,7 +10,8 @@
 #include <sys/socket.h>
 #include <string.h>
 
-static pthread_t s_input_thread;
+static pthread_t s_joystick_thread;
+static pthread_t s_rotary_thread;
 static pthread_t s_transmit_thread;
 static atomic_bool s_running = false;
 static atomic_int s_client_connected = false;
@@ -20,8 +21,8 @@ static char s_server_ip[16];
 static int s_server_port;
 
 static JoystickDirection s_current_direction = NO_DIRECTION;
-static int s_rotation_delta = 0;
-static bool s_button_pressed = false;
+static volatile int s_rotation_delta = 0;
+static volatile bool s_button_pressed = false;
 static pthread_mutex_t s_data_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static void send_initial_state(int sock_fd) {
@@ -41,25 +42,39 @@ static void send_initial_state(int sock_fd) {
     send(sock_fd, buffer, strlen(buffer), MSG_NOSIGNAL);
 }
 
-static void* input_thread_func(void* arg) {
+static void* joystick_thread_func(void* arg) {
     (void)arg;
-
     while (s_running) {
-        // Read all input devices
         JoystickOutput joystick = read_joystick();
+
+        pthread_mutex_lock(&s_data_mutex);
+        s_current_direction = joystick.direction;
+        pthread_mutex_unlock(&s_data_mutex);
+
+        usleep(20000); // 50Hz update rate
+    }
+    return NULL;
+}
+
+static void* rotary_thread_func(void* arg) {
+    (void)arg;
+    while (s_running) {
+        // Process all pending events
+        RotaryEncoder_processEvents();
+
+        // Read current state
         int rotation = RotaryEncoder_readRotation();
         bool button = RotaryEncoder_readButton();
 
-        // Update direction
-        pthread_mutex_lock(&s_data_mutex);
-        s_current_direction = joystick.direction;
-        s_rotation_delta = rotation;
-        s_button_pressed = button;
-        pthread_mutex_unlock(&s_data_mutex);
+        if (rotation != 0 || button) {
+            pthread_mutex_lock(&s_data_mutex);
+            s_rotation_delta += rotation;
+            if (button) s_button_pressed = true;
+            pthread_mutex_unlock(&s_data_mutex);
+        }
 
-        usleep(20000); // 20ms (50Hz update rate)
+        usleep(1000); // 1ms sleep for very responsive handling
     }
-
     return NULL;
 }
 
@@ -80,7 +95,8 @@ static void* transmit_thread_func(void* arg) {
             current_dir = s_current_direction;
             rotation_delta = s_rotation_delta;
             button_pressed = s_button_pressed;
-            s_rotation_delta = 0;
+            s_rotation_delta = 0; // Reset after reading
+            s_button_pressed = false; // Reset button state after sending
             pthread_mutex_unlock(&s_data_mutex);
 
             // Format data
@@ -128,7 +144,7 @@ static void* transmit_thread_func(void* arg) {
             }
         }
 
-        usleep(50000); // 50ms (20Hz send rate)
+        usleep(50000); // 20Hz send rate
     }
 
     return NULL;
@@ -153,30 +169,48 @@ bool init_thread_manager(const char* server_ip, int port) {
 
     // Start threads
     s_running = true;
-    if (pthread_create(&s_input_thread, NULL, input_thread_func, NULL) != 0) {
-        perror("Failed to create input thread");
-        if (s_client_connected) cleanup_client();
-        Gpio_cleanup();
-        return false;
+
+    // Start joystick thread
+    if (pthread_create(&s_joystick_thread, NULL, joystick_thread_func, NULL) != 0) {
+        perror("Failed to create joystick thread");
+        goto error_cleanup;
     }
 
+    // Start rotary encoder thread
+    if (pthread_create(&s_rotary_thread, NULL, rotary_thread_func, NULL) != 0) {
+        perror("Failed to create rotary thread");
+        goto error_cleanup_joystick;
+    }
+
+    // Start transmit thread
     if (pthread_create(&s_transmit_thread, NULL, transmit_thread_func, NULL) != 0) {
         perror("Failed to create transmit thread");
-        s_running = false;
-        pthread_join(s_input_thread, NULL);
-        if (s_client_connected) cleanup_client();
-        Gpio_cleanup();
-        return false;
+        goto error_cleanup_rotary;
     }
 
     return true;
+
+    error_cleanup_rotary:
+    pthread_cancel(s_rotary_thread);
+    pthread_join(s_rotary_thread, NULL);
+
+    error_cleanup_joystick:
+    pthread_cancel(s_joystick_thread);
+    pthread_join(s_joystick_thread, NULL);
+
+    error_cleanup:
+    s_running = false;
+    if (s_client_connected) cleanup_client();
+    Gpio_cleanup();
+    return false;
 }
 
 void cleanup_thread_manager(void) {
     s_running = false;
 
     // Wait for threads to finish
-    pthread_join(s_input_thread, NULL);
+    pthread_join(s_joystick_thread, NULL);
+    pthread_join(s_rotary_thread, NULL);
     pthread_join(s_transmit_thread, NULL);
 
     // Cleanup HAL modules

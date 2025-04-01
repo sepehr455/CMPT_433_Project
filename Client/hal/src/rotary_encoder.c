@@ -2,6 +2,7 @@
 #include "../include/gpio.h"
 #include <stdbool.h>
 #include <assert.h>
+#include <time.h>
 
 #define ENCODER_CHIP  GPIO_CHIP_2
 #define PIN_A         7
@@ -33,9 +34,18 @@ enum {
 
 static struct state states[NUM_STATES];
 static struct state *pCurrentState = &states[ST_REST];
-static int s_rotationDelta = 0;
-static bool s_buttonPressed = false;
-static bool s_buttonStateChanged = false;
+static volatile int s_rotationDelta = 0;
+
+// Button state variables
+static volatile bool s_buttonPressed = false;
+static volatile bool s_buttonStateChanged = false;
+static volatile bool s_buttonHandled = true;
+
+// Debouncing variables
+static struct timespec s_lastAEvent = {0, 0};
+static struct timespec s_lastBEvent = {0, 0};
+static struct timespec s_lastButtonEvent = {0, 0};
+#define DEBOUNCE_NS 5000000  // 5ms debounce time
 
 // Transition functions for rotary encoder
 static void onClockwise(void) {
@@ -79,10 +89,15 @@ void RotaryEncoder_init(void) {
     initStates();
     pCurrentState = &states[ST_REST];
 
-    // Open lines for input
+    // Open lines for input with edge detection
     s_lineA = Gpio_openForEvents(ENCODER_CHIP, PIN_A);
     s_lineB = Gpio_openForEvents(ENCODER_CHIP, PIN_B);
     s_lineButton = Gpio_openForEvents(GPIO_CHIP_0, BUTTON_PIN);
+
+    // Request both rising and falling edge detection
+    Gpio_requestEdgeEvents(s_lineA, GPIO_EDGE_BOTH);
+    Gpio_requestEdgeEvents(s_lineB, GPIO_EDGE_BOTH);
+    Gpio_requestEdgeEvents(s_lineButton, GPIO_EDGE_BOTH);
 
     // Initialize state variables
     s_rotationDelta = 0;
@@ -105,70 +120,81 @@ void RotaryEncoder_cleanup(void) {
     }
 }
 
-int RotaryEncoder_readRotation(void) {
-    // We'll use the event-based approach since your GPIO module is optimized for it
+void RotaryEncoder_processEvents(void) {
     struct gpiod_line_bulk bulkEvents;
-    int rotation = 0;
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
 
-    // Check for changes on both A and B lines
-    int numEvents = Gpio_waitForLineChange(s_lineA, &bulkEvents);
-    if (numEvents > 0) {
-        // Process state changes for line A
-        int a_val = gpiod_line_get_value((struct gpiod_line*)s_lineA);
+    // Check for changes on line A
+    if (Gpio_checkForEvent(s_lineA, &bulkEvents)) {
+        long time_since_last = (now.tv_sec - s_lastAEvent.tv_sec) * 1000000000L +
+                               (now.tv_nsec - s_lastAEvent.tv_nsec);
 
-        if (a_val) {
-            if (pCurrentState->a_rising.action) {
-                pCurrentState->a_rising.action();
+        if (time_since_last > DEBOUNCE_NS) {
+            int a_val = gpiod_line_get_value((struct gpiod_line*)s_lineA);
+            if (a_val) {
+                if (pCurrentState->a_rising.action) pCurrentState->a_rising.action();
+                pCurrentState = pCurrentState->a_rising.pNextState;
+            } else {
+                if (pCurrentState->a_falling.action) pCurrentState->a_falling.action();
+                pCurrentState = pCurrentState->a_falling.pNextState;
             }
-            pCurrentState = pCurrentState->a_rising.pNextState;
-        } else {
-            if (pCurrentState->a_falling.action) {
-                pCurrentState->a_falling.action();
-            }
-            pCurrentState = pCurrentState->a_falling.pNextState;
+            s_lastAEvent = now;
         }
     }
 
-    numEvents = Gpio_waitForLineChange(s_lineB, &bulkEvents);
-    if (numEvents > 0) {
-        // Process state changes for line B
-        int b_val = gpiod_line_get_value((struct gpiod_line*)s_lineB);
+    // Check for changes on line B
+    if (Gpio_checkForEvent(s_lineB, &bulkEvents)) {
+        long time_since_last = (now.tv_sec - s_lastBEvent.tv_sec) * 1000000000L +
+                               (now.tv_nsec - s_lastBEvent.tv_nsec);
 
-        if (b_val) {
-            if (pCurrentState->b_rising.action) {
-                pCurrentState->b_rising.action();
+        if (time_since_last > DEBOUNCE_NS) {
+            int b_val = gpiod_line_get_value((struct gpiod_line*)s_lineB);
+            if (b_val) {
+                if (pCurrentState->b_rising.action) pCurrentState->b_rising.action();
+                pCurrentState = pCurrentState->b_rising.pNextState;
+            } else {
+                if (pCurrentState->b_falling.action) pCurrentState->b_falling.action();
+                pCurrentState = pCurrentState->b_falling.pNextState;
             }
-            pCurrentState = pCurrentState->b_rising.pNextState;
-        } else {
-            if (pCurrentState->b_falling.action) {
-                pCurrentState->b_falling.action();
-            }
-            pCurrentState = pCurrentState->b_falling.pNextState;
+            s_lastBEvent = now;
         }
     }
 
-    // Return and reset accumulated rotation
-    rotation = s_rotationDelta;
+    // Check for button changes
+    if (Gpio_checkForEvent(s_lineButton, &bulkEvents)) {
+        long time_since_last = (now.tv_sec - s_lastButtonEvent.tv_sec) * 1000000000L +
+                              (now.tv_nsec - s_lastButtonEvent.tv_nsec);
+
+        if (time_since_last > DEBOUNCE_NS) {
+            int button_val = gpiod_line_get_value((struct gpiod_line*)s_lineButton);
+            bool currentState = (button_val == 0); // Assuming active-low button
+
+            // Only register new presses if button was released since last press
+            if (currentState && (!s_buttonPressed || s_buttonHandled)) {
+                s_buttonPressed = true;
+                s_buttonStateChanged = true;
+                s_buttonHandled = false;
+            } else if (!currentState) {
+                s_buttonPressed = false;
+                s_buttonHandled = true;
+            }
+
+            s_lastButtonEvent = now;
+        }
+    }
+}
+
+int RotaryEncoder_readRotation(void) {
+    int rotation = s_rotationDelta;
     s_rotationDelta = 0;
     return rotation;
 }
 
 bool RotaryEncoder_readButton(void) {
-    struct gpiod_line_bulk bulkEvents;
-    bool buttonPressed = false;
-
-    // Check for button changes
-    int numEvents = Gpio_waitForLineChange(s_lineButton, &bulkEvents);
-    if (numEvents > 0) {
-        int button_val = gpiod_line_get_value((struct gpiod_line*)s_lineButton);
-        bool currentState = (button_val == 0); // Assuming active-low button
-
-        if (currentState && !s_buttonPressed) {
-            buttonPressed = true;
-        }
-
-        s_buttonPressed = currentState;
+    if (s_buttonStateChanged && s_buttonPressed) {
+        s_buttonStateChanged = false;
+        return true;
     }
-
-    return buttonPressed;
+    return false;
 }
