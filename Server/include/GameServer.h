@@ -1,4 +1,5 @@
 #pragma once
+
 #include "Direction.h"
 #include <string>
 #include <netinet/in.h>
@@ -13,6 +14,9 @@ public:
     Direction getCurrentDirection() const;
     int getTurretRotationDelta();
     bool getButtonPressed();
+
+
+    void sendTankHealth(int health);
 
 private:
     void receiveInput();

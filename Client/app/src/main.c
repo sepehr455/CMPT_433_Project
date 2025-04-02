@@ -13,16 +13,12 @@ int main(void) {
         return EXIT_FAILURE;
     }
 
-    DrawStuff_init();
-    DisplayScreen1("hey", 2, 2);
-
     // Keep main thread alive while threads work
     while (1) {
         sleep(1);
     }
 
     // This will never be reached in current design
-    DrawStuff_cleanup();
     cleanup_thread_manager();
     return 0;
 }

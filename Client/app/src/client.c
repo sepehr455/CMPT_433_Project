@@ -44,6 +44,13 @@ int get_client_socket_fd(void) {
     return sock_fd;
 }
 
+void close_client_socket_fd (void) {
+    if (sock_fd != -1) {
+        close(sock_fd);
+        sock_fd = -1;
+    }
+}
+
 
 void cleanup_client(void) {
     if (sock_fd != -1) {

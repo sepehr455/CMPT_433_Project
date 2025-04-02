@@ -72,6 +72,9 @@ int main() {
             }
 
             gameState.updateProjectiles();
+
+            // Send tank health to client after collisions are processed
+            server.sendTankHealth(gameState.getTank().health);
         }
 
         auto frameEnd = std::chrono::steady_clock::now();

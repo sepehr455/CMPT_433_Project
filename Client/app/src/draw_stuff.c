@@ -7,7 +7,24 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <string.h>
 
+// If your library doesn't define these, you can define them here:
+#ifndef RED
+#define RED 0xF800
+#endif
+#ifndef GREEN
+#define GREEN 0x07E0
+#endif
+#ifndef YELLOW
+#define YELLOW 0xFFE0
+#endif
+#ifndef BLACK
+#define BLACK 0x0000
+#endif
+#ifndef WHITE
+#define WHITE 0xFFFF
+#endif
 
 // LCD frame buffer
 static UWORD *s_fb = NULL;
@@ -62,88 +79,100 @@ void turnOffLCD(void) {
 }
 
 
-// Screen 1: Beat Status Screen
-// Displays the beat name (center), volume (bottom left), and BPM (bottom right)
-void DisplayScreen1(const char* beatName, int volume, int bpm) {
+
+//  Display the tank's health in four states.
+//
+#ifndef ORANGE
+#define ORANGE 0xFD20
+#endif
+#ifndef GRAY
+#define GRAY 0x8410  // Mid-tone gray in RGB565
+#endif
+#ifndef DARK_GRAY
+#define DARK_GRAY 0x4208
+#endif
+
+void DisplayTankStatus(int health) {
     assert(s_isInitialized);
 
     Paint_NewImage(s_fb, LCD_1IN54_WIDTH, LCD_1IN54_HEIGHT, 0, WHITE, 16);
     Paint_Clear(WHITE);
 
-    // Display the beat name in the middle of the screen.
-    int centerX = 5;
-    int centerY = (LCD_1IN54_HEIGHT / 2) - 10;
-    Paint_DrawString_EN(centerX, centerY, (char *)beatName, &Font16, WHITE, BLACK);
+    // Draw health text
+    char statusLine[64];
+    if (health >= 3) sprintf(statusLine, "Tank Health: FULL (3/3)");
+    else if (health == 2) sprintf(statusLine, "Tank Health: Damaged (2/3)");
+    else if (health == 1) sprintf(statusLine, "Tank Health: Critical (1/3)");
+    else sprintf(statusLine, "Tank Health: DESTROYED (0/3)");
 
-    // Display volume at bottom left
-    char line[64];
-    snprintf(line, sizeof(line), "Vol: %d", volume);
-    Paint_DrawString_EN(5, LCD_1IN54_HEIGHT - 20, line, &Font16, WHITE, BLACK);
+    Paint_DrawString_EN(5, 5, statusLine, &Font16, WHITE, BLACK);
 
-    // Display BPM at bottom right
-    snprintf(line, sizeof(line), "%d BPM", bpm);
+    // --- Tank Geometry ---
+    // Wider tank shape (horizontal layout)
+    int hullLeft   = 60;
+    int hullTop    = 100;
+    int hullRight  = 180;
+    int hullBottom = 140;
 
-    // Calculate the width of the BPM text
-    int textWidth = strlen(line) * Font16.Width;
+    int turretLeft   = 100;
+    int turretTop    = 110;
+    int turretRight  = 140;
+    int turretBottom = 130;
 
-    // Position the BPM text at the bottom right, with a small margin
-    int bpmX = LCD_1IN54_WIDTH - textWidth - 5;
-    if (bpmX < 0) bpmX = 0;  // Prevent out-of-bounds text placement
+    int barrelStartX = turretRight;
+    int barrelStartY = (turretTop + turretBottom) / 2;
+    int barrelEndX   = 200;
+    int barrelEndY   = barrelStartY;
 
-    int bpmY = LCD_1IN54_HEIGHT - 20;
+    // Tank color based on health
+    UWORD tankColor;
+    if (health >= 3) tankColor = GREEN;
+    else if (health == 2) tankColor = YELLOW;
+    else if (health == 1) tankColor = RED;
+    else tankColor = DARK_GRAY;
 
+    // Draw hull
+    Paint_DrawRectangle(hullLeft, hullTop, hullRight, hullBottom, BLACK, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+    Paint_DrawRectangle(hullLeft + 1, hullTop + 1, hullRight - 1, hullBottom - 1, tankColor, DOT_PIXEL_1X1, DRAW_FILL_FULL);
 
-    Paint_DrawString_EN(bpmX, bpmY, line, &Font16, WHITE, BLACK);
+    // Draw turret
+    Paint_DrawRectangle(turretLeft, turretTop, turretRight, turretBottom, BLACK, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
+    Paint_DrawRectangle(turretLeft + 1, turretTop + 1, turretRight - 1, turretBottom - 1, tankColor, DOT_PIXEL_1X1, DRAW_FILL_FULL);
 
-    LCD_1IN54_Display(s_fb);
-}
+    // Draw barrel
+    if (health > 0) {
+        Paint_DrawLine(barrelStartX, barrelStartY, barrelEndX, barrelEndY, BLACK, DOT_PIXEL_3X3, LINE_STYLE_SOLID);
+    }
 
-// Screen 2: Audio Timing Screen
-// Displays a title and sample timing values (min, max, avg)
-void DisplayScreen2(int audioMin, int audioMax, double audioAvg) {
-    assert(s_isInitialized);
+    // Damage effects
+    if (health == 2) {
+        Paint_DrawLine(70, 110, 80, 120, RED, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
+        Paint_DrawLine(150, 125, 160, 135, RED, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
+    } else if (health == 1) {
+        Paint_DrawLine(70, 110, 90, 125, RED, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
+        Paint_DrawLine(160, 105, 150, 115, RED, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
+        Paint_DrawLine(100, 135, 110, 145, RED, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
+        Paint_DrawLine(140, 120, 150, 130, RED, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
 
-    Paint_NewImage(s_fb, LCD_1IN54_WIDTH, LCD_1IN54_HEIGHT, 0, WHITE, 16);
-    Paint_Clear(WHITE);
+        // Small flame
+        Paint_DrawCircle(150, 100, 6, ORANGE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawCircle(150, 98, 3, RED, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    } else if (health <= 0) {
+        // X across tank
+        Paint_DrawLine(hullLeft, hullTop, hullRight, hullBottom, WHITE, DOT_PIXEL_3X3, LINE_STYLE_SOLID);
+        Paint_DrawLine(hullRight, hullTop, hullLeft, hullBottom, WHITE, DOT_PIXEL_3X3, LINE_STYLE_SOLID);
 
-    // Title
-    Paint_DrawString_EN(5, 5, "Audio Timing", &Font16, WHITE, BLACK);
+        // Smoke effect
+        Paint_DrawCircle(140, 90, 10, GRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawCircle(150, 85, 8, DARK_GRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawCircle(130, 95, 6, GRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawCircle(145, 100, 5, GRAY, DOT_PIXEL_1X1, DRAW_FILL_FULL);
 
-    // Display timing info
-    char line[64];
-    snprintf(line, sizeof(line), "Min: %d ms", audioMin);
-    Paint_DrawString_EN(5, 30, line, &Font16, WHITE, BLACK);
-
-    snprintf(line, sizeof(line), "Max: %d ms", audioMax);
-    Paint_DrawString_EN(5, 55, line, &Font16, WHITE, BLACK);
-
-    snprintf(line, sizeof(line), "Avg: %.2f ms", audioAvg);
-    Paint_DrawString_EN(5, 80, line, &Font16, WHITE, BLACK);
-
-    LCD_1IN54_Display(s_fb);
-}
-
-// Screen 3: Accelerometer Timing Screen
-// Displays a title and sample timing values for the accelerometer (min, max, avg)
-void DisplayScreen3(int accelMin, int accelMax, double accelAvg) {
-    assert(s_isInitialized);
-
-    Paint_NewImage(s_fb, LCD_1IN54_WIDTH, LCD_1IN54_HEIGHT, 0, WHITE, 16);
-    Paint_Clear(WHITE);
-
-    // Title
-    Paint_DrawString_EN(5, 5, "Accel. Timing", &Font16, WHITE, BLACK);
-
-    // Display timing info
-    char line[64];
-    snprintf(line, sizeof(line), "Min: %d ms", accelMin);
-    Paint_DrawString_EN(5, 30, line, &Font16, WHITE, BLACK);
-
-    snprintf(line, sizeof(line), "Max: %d ms", accelMax);
-    Paint_DrawString_EN(5, 55, line, &Font16, WHITE, BLACK);
-
-    snprintf(line, sizeof(line), "Avg: %.2f ms", accelAvg);
-    Paint_DrawString_EN(5, 80, line, &Font16, WHITE, BLACK);
+        // Big flame
+        Paint_DrawCircle(150, 105, 10, ORANGE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawCircle(150, 102, 5, RED, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+        Paint_DrawCircle(153, 107, 3, YELLOW, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    }
 
     LCD_1IN54_Display(s_fb);
 }

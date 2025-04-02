@@ -1,13 +1,13 @@
-#ifndef THREAD_MANAGER_H
-#define THREAD_MANAGER_H
-
+#pragma once
 #include <stdbool.h>
 
-/**
- * Module for managing all input threads and data transmission
- */
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 bool init_thread_manager(const char* server_ip, int port);
 void cleanup_thread_manager(void);
 
+#ifdef __cplusplus
+}
 #endif

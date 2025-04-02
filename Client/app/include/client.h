@@ -9,6 +9,8 @@ bool init_client(const char* , int port);
 
 int get_client_socket_fd(void);
 
+void close_client_socket_fd(void);
+
 // Closes the joystick client connection
 void cleanup_client(void);
 

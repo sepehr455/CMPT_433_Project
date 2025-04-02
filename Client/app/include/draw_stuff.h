@@ -21,4 +21,8 @@ void DisplayScreen2(int audioMin, int audioMax, double audioAvg);
 // Screen 3: Displays accelerometer timing statistics (hardcoded for now)
 void DisplayScreen3(int accelMin, int accelMax, double accelAvg);
 
+// Display the tank's health (0..3).
+// 3 -> fully healthy, 2 -> lightly damaged, 1 -> heavily damaged, 0 -> destroyed
+void DisplayTankStatus(int health);
+
 #endif

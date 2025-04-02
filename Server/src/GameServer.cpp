@@ -3,7 +3,7 @@
 #include <arpa/inet.h>
 #include <thread>
 #include <iostream>
-#include <csignal>
+#include <unistd.h>
 
 GameServer::GameServer(int port) :
         currentDirection(Direction::NONE),
@@ -41,6 +41,7 @@ GameServer::~GameServer() {
 }
 
 void GameServer::start() {
+    addr_len = sizeof(client_addr);
     client_fd = accept(server_fd, (struct sockaddr*)&client_addr, &addr_len);
     if (client_fd < 0) {
         perror("Accept failed");
@@ -116,5 +117,19 @@ void GameServer::processInputToken(const std::string& token) {
     }
     else if (token.find("BTN:") == 0) {
         buttonPressed = (token.substr(4) == "1");
+    }
+}
+
+// Send tank health to client
+void GameServer::sendTankHealth(int health) {
+    if (client_fd > 0) {
+        char buffer[16];
+        snprintf(buffer, sizeof(buffer), "HP:%d", health);
+
+        // If send fails, this simply prints an error. For production code,
+        // you might want to handle reconnection or mark the client as disconnected.
+        if (send(client_fd, buffer, strlen(buffer), 0) == -1) {
+            perror("Failed to send tank health");
+        }
     }
 }
