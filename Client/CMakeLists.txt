@@ -21,5 +21,8 @@ set(NFS_TARGET_DIR "$ENV{HOME}/cmpt433/public/myApps/Project")
 execute_process(COMMAND mkdir -p ${NFS_TARGET_DIR})
 
 # Add subdirectories for hal and app
+add_subdirectory(lcd)
 add_subdirectory(hal)
+add_subdirectory(lgpio)
 add_subdirectory(app)
+
