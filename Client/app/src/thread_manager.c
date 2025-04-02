@@ -4,6 +4,7 @@
 #include "../include/client.h"
 #include "gpio.h"
 #include "draw_stuff.h"
+#include "sound_effects.h"
 #include <pthread.h>
 #include <stdatomic.h>
 #include <unistd.h>
@@ -84,7 +85,12 @@ static void *rotary_thread_func(void *arg) {
         if (rotation != 0 || button) {
             pthread_mutex_lock(&s_data_mutex);
             s_rotation_delta += rotation;
-            if (button) s_button_pressed = true;
+            if (button) {
+                s_button_pressed = true;
+
+                // Play shooting sound
+                SoundEffects_playShoot();
+            }
             pthread_mutex_unlock(&s_data_mutex);
         }
 
@@ -236,7 +242,6 @@ static void *lcd_thread_func(void *arg) {
     return NULL;
 }
 
-// -------------------- INIT / CLEANUP --------------------
 
 bool init_thread_manager(const char *server_ip, int port) {
     // Store connection info
@@ -249,6 +254,7 @@ bool init_thread_manager(const char *server_ip, int port) {
     Gpio_initialize();
     init_joystick();
     RotaryEncoder_init();
+    SoundEffects_init();
 
     // Initialize client connection
     s_client_connected = init_client(s_server_ip, s_server_port);
@@ -336,5 +342,6 @@ void cleanup_thread_manager(void) {
     RotaryEncoder_cleanup();
     Gpio_cleanup();
     DrawStuff_cleanup();
+    SoundEffects_cleanup();
     cleanup_client();
 }
