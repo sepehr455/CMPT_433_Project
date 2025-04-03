@@ -6,8 +6,8 @@
 #include "draw_stuff.h"
 #include "sound_effects.h"
 #include "shutdown.h"
+#include "led.h"
 #include <pthread.h>
-#include <stdatomic.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <sys/socket.h>
@@ -38,8 +38,7 @@ static atomic_int s_tank_health = 3;
 // Forward declarations
 static void send_initial_state(int sock_fd);
 
-// -------------------- INITIAL STATE SENDER --------------------
-
+// Initial State Sender
 static void send_initial_state(int sock_fd) {
     char buffer[32] = "NONE";
 
@@ -212,9 +211,13 @@ static void *receive_thread_func(void *arg) {
             // Split messages by newline in case multiple came in
             char *message = strtok(recv_buf, "\n");
             while (message != NULL) {
+                printf("Received: %s\n", message);
 
                 if (strncmp(message, "HP:", 3) == 0) {
                     s_tank_health = atoi(message + 3);
+                } else if (strcmp(message, "HIT") == 0) {
+                    SoundEffects_playHit();
+                    flash_LED(RED, 3, 333);
                 } else if (strcmp(message, "GAME_OVER") == 0) {
                     SoundEffects_playLost();
                     printf("Received game over from server. Shutting down...\n");
@@ -260,6 +263,7 @@ bool init_thread_manager(const char *server_ip, int port) {
     init_joystick();
     RotaryEncoder_init();
     SoundEffects_init();
+    init_LEDs();
 
     // Initialize client connection
     s_client_connected = init_client(s_server_ip, s_server_port);
@@ -325,6 +329,7 @@ bool init_thread_manager(const char *server_ip, int port) {
     if (s_client_connected) {
         cleanup_client();
     }
+    cleanup_LEDs();
     Gpio_cleanup();
     DrawStuff_cleanup();
     return false;
@@ -348,4 +353,5 @@ void cleanup_thread_manager(void) {
     DrawStuff_cleanup();
     SoundEffects_cleanup();
     cleanup_client();
+    cleanup_LEDs();
 }

@@ -8,6 +8,8 @@
 #include <random>
 #include <mutex>
 
+class GameServer;
+
 struct Projectile {
     float x, y;
     float angle;
@@ -36,6 +38,8 @@ public:
 
     std::recursive_mutex& getMutex() { return mtx; }
 
+    void setServer(GameServer* srv);
+
 private:
     Tank tank;
     float turretAngle;
@@ -50,4 +54,6 @@ private:
     bool playerAlive;
     static constexpr float ENEMY_SHOOT_INTERVAL = 3.0f;
     static constexpr float HIT_EFFECT_DURATION = 0.5f;
+
+    GameServer* server = nullptr;
 };

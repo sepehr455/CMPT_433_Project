@@ -9,13 +9,7 @@ extern "C" {
  */
 
 void SoundEffects_init(void);
-
 void SoundEffects_cleanup(void);
-
 void SoundEffects_playShoot(void);
-
 void SoundEffects_playLost(void);
-
-#ifdef __cplusplus
-}
-#endif
+void SoundEffects_playHit(void);

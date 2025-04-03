@@ -24,7 +24,7 @@ static short *playbackBuffer = NULL;
 #define MAX_SOUND_BITES 30
 typedef struct {
     wavedata_t *pSound;
-    int location;       // offset into the sound data
+    int location;
 } playbackSound_t;
 static playbackSound_t soundBites[MAX_SOUND_BITES];
 

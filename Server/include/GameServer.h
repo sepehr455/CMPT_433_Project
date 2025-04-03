@@ -19,6 +19,7 @@ public:
 
     void sendTankHealth(int health) const;
     void sendGameOver(const char* message) const;
+    void sendHitMessage() const;
 
 
 private:

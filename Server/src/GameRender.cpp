@@ -172,8 +172,8 @@ void GameRender::run(GameState &state, Direction &lastDir, std::atomic<bool>& ru
     }
 
     // Explicitly release SFML resources
-    gameOverText = sf::Text();  // Releases font reference
-    bodySprite = sf::Sprite();  // Releases texture references
+    gameOverText = sf::Text();
+    bodySprite = sf::Sprite();
     turretSprite = sf::Sprite();
     backgroundSprite = sf::Sprite();
 }

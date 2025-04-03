@@ -1,4 +1,5 @@
 #include "../include/GameState.h"
+#include "GameServer.h"
 #include <algorithm>
 #include <cmath>
 #include <ctime>
@@ -152,11 +153,13 @@ void GameState::checkTankHit() {
     if (!playerAlive) return;
 
     for (auto it = projectiles.begin(); it != projectiles.end(); ) {
+
+        // Player tank hit detection
         if (it->isEnemyProjectile) {
             float dx = it->x - tank.x;
             float dy = it->y - tank.y;
             float distance = std::sqrt(dx * dx + dy * dy);
-            if (distance < 20.0f) { // Assuming tank radius is ~20
+            if (distance < 20.0f) {
                 tank.health--;
                 tankHitEffectTimer = HIT_EFFECT_DURATION;
                 it = projectiles.erase(it);
@@ -164,6 +167,11 @@ void GameState::checkTankHit() {
                 if (tank.health <= 0) {
                     playerAlive = false;
                 }
+
+                if (server) {
+                    server->sendHitMessage();
+                }
+
                 continue;
             }
         }
@@ -193,4 +201,8 @@ bool GameState::isPlayerAlive() const {
 
 float GameState::getTankHitEffect() const {
     return tankHitEffectTimer;
+}
+
+void GameState::setServer(GameServer* srv) {
+    server = srv;
 }

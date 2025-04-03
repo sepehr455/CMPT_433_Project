@@ -152,6 +152,14 @@ void GameServer::sendGameOver(const char* message) const {
     }
 }
 
+void GameServer::sendHitMessage() const {
+    if (client_fd > 0) {
+        const char* message = "HIT\n";
+        if (send(client_fd, message, strlen(message), 0) == -1) {
+            perror("Failed to send hit message");
+        }
+    }
+}
 
 void GameServer::stop() {
     if (client_fd > 0) {

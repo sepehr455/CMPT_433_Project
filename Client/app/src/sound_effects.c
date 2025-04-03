@@ -3,10 +3,9 @@
 #include "audioMixer.h"
 
 
-// We will load the shoot wave file into this structure:
 static wavedata_t shootSound;
-// We will also load the lost wave file into this structure:
 static wavedata_t lostSound;
+static wavedata_t hitSound;
 
 static int isInitialized = 0;
 
@@ -20,6 +19,7 @@ void SoundEffects_init(void) {
 
     AudioMixer_readWaveFileIntoMemory("wav-files/shoot.wav", &shootSound);
     AudioMixer_readWaveFileIntoMemory("wav-files/lost.wav", &lostSound);
+    AudioMixer_readWaveFileIntoMemory("wav-files/hit.wav", &hitSound);
 
     isInitialized = 1;
 }
@@ -57,4 +57,11 @@ void SoundEffects_playLost(void) {
     }
 
     AudioMixer_queueSound(&lostSound);
+}
+
+void SoundEffects_playHit(void) {
+    if (!isInitialized) {
+        return;
+    }
+    AudioMixer_queueSound(&hitSound);
 }

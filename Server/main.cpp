@@ -24,6 +24,7 @@ int main() {
     server.start();
 
     GameState gameState;
+    gameState.setServer(&server);
     GameRender renderer;
 
     // Track movement and rotation separately.
