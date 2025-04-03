@@ -2,13 +2,14 @@
 #include <SFML/Graphics.hpp>
 #include "GameState.h"
 #include "Direction.h"
+#include <atomic>
 
 class GameRender {
 public:
     GameRender();
     ~GameRender();
 
-    void run(GameState& state, Direction& currentDir);
+    void run(GameState& state, Direction& currentDir, std::atomic<bool>& running);
 
 private:
     sf::RenderWindow window;
@@ -23,4 +24,9 @@ private:
     sf::CircleShape projectileShape;
     sf::Clock deltaClock;
     sf::RectangleShape hitEffect;
+
+    // For Game Over
+    sf::Font gameOverFont;
+    sf::Text gameOverText;
+    sf::RectangleShape overlay;
 };

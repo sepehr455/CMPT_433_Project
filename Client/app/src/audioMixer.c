@@ -1,7 +1,6 @@
 #include "audioMixer.h"
 #include <alsa/asoundlib.h>
 #include <stdbool.h>
-#include <stdint.h>
 #include <pthread.h>
 #include <limits.h>
 #include <time.h>
@@ -274,10 +273,3 @@ static void fillPlaybackBuffer(short *buff, int size) {
     }
     pthread_mutex_unlock(&audioMutex);
 }
-
-// Stats getters
-int AudioMixer_getMinLatency(void) { return audioMinLatency; }
-
-int AudioMixer_getMaxLatency(void) { return audioMaxLatency; }
-
-double AudioMixer_getAvgLatency(void) { return audioAvgLatency; }

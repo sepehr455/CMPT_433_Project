@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <mutex>
+#include "Shutdown.h"
 
 GameRender::GameRender()
         : window(sf::VideoMode(1024, 768), "Tank Game") {
@@ -66,20 +67,34 @@ GameRender::GameRender()
     hitEffect.setSize(sf::Vector2f(50, 50));
     hitEffect.setFillColor(sf::Color(255, 0, 0, 150));
     hitEffect.setOrigin(25, 25);
+
+    // For Game Over Text
+    if (!gameOverFont.loadFromFile("Assets/arial.ttf")) {
+        std::cerr << "Failed to load font for game over text" << std::endl;
+    }
+    gameOverText.setFont(gameOverFont);
+    gameOverText.setCharacterSize(100);
+    gameOverText.setFillColor(sf::Color::Red);
+    gameOverText.setString("GAME OVER");
+
+    overlay.setSize(sf::Vector2f(1024.f, 768.f));
+    overlay.setFillColor(sf::Color(0, 0, 0, 128));
 }
 
-void GameRender::run(GameState &state, Direction &lastDir) {
-    while (window.isOpen()) {
+void GameRender::run(GameState &state, Direction &lastDir, std::atomic<bool>& running) {
+    while (window.isOpen() && running && !ShutdownModule::isShutdownRequested()) {
         float dt = deltaClock.restart().asSeconds();
 
         // Handle window events.
         sf::Event event;
         while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed)
-                window.close();
+            if (event.type == sf::Event::Closed) {
+                running = false;
+                ShutdownModule::requestShutdown();
+                break;
+            }
         }
 
-        // Draw the grass background.
         window.clear();
         window.draw(backgroundSprite);
 
@@ -135,9 +150,32 @@ void GameRender::run(GameState &state, Direction &lastDir) {
             }
         }
 
+        if (!state.isPlayerAlive()) {
+            // Draw a semi-transparent overlay
+            overlay.setPosition(0.f, 0.f);
+            window.draw(overlay);
+
+            // Center the "GAME OVER" text
+            sf::FloatRect textRect = gameOverText.getLocalBounds();
+            gameOverText.setOrigin(textRect.width / 2.0f, textRect.height / 2.0f);
+            gameOverText.setPosition(1024.f / 2.0f, 768.f / 2.0f);
+            window.draw(gameOverText);
+        }
+
         window.display();
         sf::sleep(sf::milliseconds(16));
     }
+
+    // Clean up SFML resources while OpenGL context is still valid
+    if (window.isOpen()) {
+        window.close();
+    }
+
+    // Explicitly release SFML resources
+    gameOverText = sf::Text();  // Releases font reference
+    bodySprite = sf::Sprite();  // Releases texture references
+    turretSprite = sf::Sprite();
+    backgroundSprite = sf::Sprite();
 }
 
 GameRender::~GameRender() {

@@ -8,7 +8,22 @@ set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
 
 # Compiler options (applied globally)
 set(CMAKE_C_STANDARD 11)
-add_compile_options(-Wall -Werror -Wpedantic -Wextra -O2)
+
+# Always enable AddressSanitizer in Debug builds
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    # AddressSanitizer flags
+    add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address)
+
+    # For better stack traces
+    add_compile_options(-g)
+
+    message(STATUS "AddressSanitizer enabled (Debug build)")
+else()
+    # Regular optimization flags for Release builds
+    add_compile_options(-Wall -Werror -Wpedantic -Wextra -O2)
+    message(STATUS "AddressSanitizer disabled (Release build)")
+endif()
 
 # Enable pthread for multithreading support
 add_compile_options(-pthread)

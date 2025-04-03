@@ -5,6 +5,7 @@
 #include "gpio.h"
 #include "draw_stuff.h"
 #include "sound_effects.h"
+#include "shutdown.h"
 #include <pthread.h>
 #include <stdatomic.h>
 #include <unistd.h>
@@ -15,8 +16,6 @@
 static pthread_t s_joystick_thread;
 static pthread_t s_rotary_thread;
 static pthread_t s_transmit_thread;
-
-// threads for receiving server messages and updating LCD
 static pthread_t s_receive_thread;
 static pthread_t s_lcd_thread;
 
@@ -60,7 +59,7 @@ static void send_initial_state(int sock_fd) {
 
 static void *joystick_thread_func(void *arg) {
     (void) arg;
-    while (s_running) {
+    while (s_running && !is_shutdown_requested()) {
         JoystickOutput joystick = read_joystick();
 
         pthread_mutex_lock(&s_data_mutex);
@@ -74,8 +73,7 @@ static void *joystick_thread_func(void *arg) {
 
 static void *rotary_thread_func(void *arg) {
     (void) arg;
-    while (s_running) {
-        // Process all pending events
+    while (s_running && !is_shutdown_requested()) {
         RotaryEncoder_processEvents();
 
         // Read current state
@@ -101,8 +99,7 @@ static void *rotary_thread_func(void *arg) {
 
 static void *transmit_thread_func(void *arg) {
     (void) arg;
-
-    while (s_running) {
+    while (s_running && !is_shutdown_requested()) {
         if (s_client_connected) {
             JoystickDirection current_dir;
             int rotation_delta;
@@ -159,7 +156,7 @@ static void *transmit_thread_func(void *arg) {
                 } else {
                     perror("Failed to send input data");
                     retry_count++;
-                    usleep(50000); // Wait 50ms before retry
+                    usleep(50000);
                 }
             }
 
@@ -172,26 +169,23 @@ static void *transmit_thread_func(void *arg) {
                 s_client_connected = true;
                 send_initial_state(get_client_socket_fd());
             } else {
-                usleep(100000); // Wait 100ms before next reconnect attempt
+                usleep(100000);
             }
         }
 
-        usleep(50000); // 20Hz send rate
+        usleep(50000);
     }
 
     return NULL;
 }
 
-
-// Reads from server; if we get "HP:xx", we update s_tank_health.
-
 static void *receive_thread_func(void *arg) {
     (void) arg;
 
     char recv_buf[64];
-    while (s_running) {
+    while (s_running && !is_shutdown_requested()) {
         if (!s_client_connected) {
-            usleep(100000); // no connection, just wait
+            usleep(100000);
             continue;
         }
 
@@ -212,11 +206,23 @@ static void *receive_thread_func(void *arg) {
             s_client_connected = false;
             close_client_socket_fd();
         } else {
-            // parse server message
-            // e.g. "HP:2", "HP:0"
-            if (strncmp(recv_buf, "HP:", 3) == 0) {
-                int newHealth = atoi(recv_buf + 3);
-                s_tank_health = newHealth;
+            // Ensure null termination
+            recv_buf[ret] = '\0';
+
+            // Split messages by newline in case multiple came in
+            char *message = strtok(recv_buf, "\n");
+            while (message != NULL) {
+
+                if (strncmp(message, "HP:", 3) == 0) {
+                    s_tank_health = atoi(message + 3);
+                } else if (strcmp(message, "GAME_OVER") == 0) {
+                    SoundEffects_playLost();
+                    printf("Received game over from server. Shutting down...\n");
+                    request_shutdown();
+                    break;
+                }
+
+                message = strtok(NULL, "\n");
             }
         }
 
@@ -230,9 +236,8 @@ static void *receive_thread_func(void *arg) {
 // Periodically display the tank's current health on the LCD.
 static void *lcd_thread_func(void *arg) {
     (void) arg;
-
-    while (s_running) {
-        int localHealth = s_tank_health; // atomic read
+    while (s_running && !is_shutdown_requested()) {
+        int localHealth = s_tank_health;
         DisplayTankStatus(localHealth);
 
         // Sleep half a second so we aren't spamming the LCD too often
@@ -332,8 +337,6 @@ void cleanup_thread_manager(void) {
     pthread_join(s_joystick_thread, NULL);
     pthread_join(s_rotary_thread, NULL);
     pthread_join(s_transmit_thread, NULL);
-
-    //
     pthread_join(s_receive_thread, NULL);
     pthread_join(s_lcd_thread, NULL);
 
@@ -341,6 +344,7 @@ void cleanup_thread_manager(void) {
     cleanup_joystick();
     RotaryEncoder_cleanup();
     Gpio_cleanup();
+    turnOffLCD();
     DrawStuff_cleanup();
     SoundEffects_cleanup();
     cleanup_client();

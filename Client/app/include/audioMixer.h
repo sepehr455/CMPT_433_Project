@@ -25,16 +25,6 @@ void AudioMixer_freeWaveFileData(wavedata_t *pSound);
 // Queue up another sound to play.
 void AudioMixer_queueSound(wavedata_t *pSound);
 
-// Get/set volume
-int AudioMixer_getVolume(void);
-
 void AudioMixer_setVolume(int newVolume);
-
-// For debugging or stats if you like
-int AudioMixer_getMinLatency(void);
-
-int AudioMixer_getMaxLatency(void);
-
-double AudioMixer_getAvgLatency(void);
 
 #endif

@@ -1,6 +1,6 @@
 include_directories(include)
 
-file(GLOB MY_SOURCES "src/*.c" "src/client.c" "src/thread_manager.c" "src/draw_stuff.c" "src/audioMixer.c" "src/sound_effects.c")
+file(GLOB MY_SOURCES "src/*.c" "src/client.c" "src/thread_manager.c" "src/draw_stuff.c" "src/audioMixer.c" "src/sound_effects.c" "src/shutdown.c")
 
 # Rename the executable to "tank_client"
 add_executable(tank_client ${MY_SOURCES})

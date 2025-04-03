@@ -1,4 +1,5 @@
 #include "../include/GameServer.h"
+#include "Shutdown.h"
 #include <cstring>
 #include <arpa/inet.h>
 #include <thread>
@@ -8,11 +9,17 @@
 GameServer::GameServer(int port) :
         currentDirection(Direction::NONE),
         turretRotationDelta(0),
-        buttonPressed(false)
-{
+        buttonPressed(false) {
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd == -1) {
         perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Set SO_REUSEADDR to avoid "address already in use" errors
+    int opt = 1;
+    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        perror("setsockopt failed");
         exit(EXIT_FAILURE);
     }
 
@@ -21,7 +28,7 @@ GameServer::GameServer(int port) :
     server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port = htons(port);
 
-    if (bind(server_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+    if (bind(server_fd, (struct sockaddr *) &server_addr, sizeof(server_addr))) {
         perror("Bind failed");
         exit(EXIT_FAILURE);
     }
@@ -33,19 +40,22 @@ GameServer::GameServer(int port) :
     }
 
     std::cout << "Server started on port " << port << std::endl;
+    registerServerCleanup();
 }
 
 GameServer::~GameServer() {
-    close(client_fd);
-    close(server_fd);
+    stop();
 }
 
 void GameServer::start() {
     addr_len = sizeof(client_addr);
-    client_fd = accept(server_fd, (struct sockaddr*)&client_addr, &addr_len);
+    client_fd = accept(server_fd, (struct sockaddr *) &client_addr, &addr_len);
     if (client_fd < 0) {
-        perror("Accept failed");
-        exit(EXIT_FAILURE);
+        if (!ShutdownModule::isShutdownRequested()) {
+            perror("Accept failed");
+            exit(EXIT_FAILURE);
+        }
+        return;
     }
 
     std::cout << "Client connected: " << inet_ntoa(client_addr.sin_addr) << std::endl;
@@ -75,7 +85,7 @@ void GameServer::receiveInput() {
     char buffer[32];
 
     // Send initial state request
-    const char* init_request = "INIT";
+    const char *init_request = "INIT";
     write(client_fd, init_request, strlen(init_request));
 
     while (true) {
@@ -121,15 +131,45 @@ void GameServer::processInputToken(const std::string& token) {
 }
 
 // Send tank health to client
-void GameServer::sendTankHealth(int health) {
+void GameServer::sendTankHealth(int health) const {
     if (client_fd > 0) {
         char buffer[16];
-        snprintf(buffer, sizeof(buffer), "HP:%d", health);
+        snprintf(buffer, sizeof(buffer), "HP:%d\n", health);
 
-        // If send fails, this simply prints an error. For production code,
-        // you might want to handle reconnection or mark the client as disconnected.
+        // If send fails, this simply prints an error.
         if (send(client_fd, buffer, strlen(buffer), 0) == -1) {
             perror("Failed to send tank health");
         }
     }
+}
+
+
+void GameServer::sendGameOver(const char* message) const {
+    if (client_fd > 0) {
+        if (send(client_fd, message, strlen(message), 0) == -1) {
+            perror("Failed to send game over message");
+        }
+    }
+}
+
+
+void GameServer::stop() {
+    if (client_fd > 0) {
+        shutdown(client_fd, SHUT_RDWR);
+        close(client_fd);
+        client_fd = -1;
+    }
+    if (server_fd > 0) {
+        shutdown(server_fd, SHUT_RDWR);
+        close(server_fd);
+        server_fd = -1;
+    }
+    std::cout << "Server stopped" << std::endl;
+}
+
+void GameServer::registerServerCleanup() {
+    ShutdownModule::registerCleanupHandler([this]() {
+        std::cout << "Cleaning up server resources..." << std::endl;
+        this->stop();
+    });
 }

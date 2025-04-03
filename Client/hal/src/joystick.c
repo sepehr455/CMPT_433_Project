@@ -84,6 +84,7 @@ void init_joystick(void) {
 
 // **Cleanup Joystick**
 void cleanup_joystick(void) {
+    fprintf(stderr, "Cleaning up joystick module...\n");
     if (I2C_fd != -1) {
         close(I2C_fd);
         I2C_fd = -1;

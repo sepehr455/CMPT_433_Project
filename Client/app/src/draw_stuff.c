@@ -58,8 +58,8 @@ void DrawStuff_init(void) {
 }
 
 
-
 void DrawStuff_cleanup(void) {
+    printf("LCD: Cleaning up LCD\n");
     assert(s_isInitialized);
 
     free(s_fb);
@@ -71,6 +71,7 @@ void DrawStuff_cleanup(void) {
 
 
 void turnOffLCD(void) {
+    printf("LCD: Turning off LCD\n");
     assert(s_isInitialized);
 
     LCD_1IN54_Clear(WHITE);
@@ -109,20 +110,20 @@ void DisplayTankStatus(int health) {
 
     // --- Tank Geometry ---
     // Wider tank shape (horizontal layout)
-    int hullLeft   = 60;
-    int hullTop    = 100;
-    int hullRight  = 180;
+    int hullLeft = 60;
+    int hullTop = 100;
+    int hullRight = 180;
     int hullBottom = 140;
 
-    int turretLeft   = 100;
-    int turretTop    = 110;
-    int turretRight  = 140;
+    int turretLeft = 100;
+    int turretTop = 110;
+    int turretRight = 140;
     int turretBottom = 130;
 
     int barrelStartX = turretRight;
     int barrelStartY = (turretTop + turretBottom) / 2;
-    int barrelEndX   = 200;
-    int barrelEndY   = barrelStartY;
+    int barrelEndX = 200;
+    int barrelEndY = barrelStartY;
 
     // Tank color based on health
     UWORD tankColor;
@@ -133,11 +134,13 @@ void DisplayTankStatus(int health) {
 
     // Draw hull
     Paint_DrawRectangle(hullLeft, hullTop, hullRight, hullBottom, BLACK, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
-    Paint_DrawRectangle(hullLeft + 1, hullTop + 1, hullRight - 1, hullBottom - 1, tankColor, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(hullLeft + 1, hullTop + 1, hullRight - 1, hullBottom - 1, tankColor, DOT_PIXEL_1X1,
+                        DRAW_FILL_FULL);
 
     // Draw turret
     Paint_DrawRectangle(turretLeft, turretTop, turretRight, turretBottom, BLACK, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
-    Paint_DrawRectangle(turretLeft + 1, turretTop + 1, turretRight - 1, turretBottom - 1, tankColor, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(turretLeft + 1, turretTop + 1, turretRight - 1, turretBottom - 1, tankColor, DOT_PIXEL_1X1,
+                        DRAW_FILL_FULL);
 
     // Draw barrel
     if (health > 0) {

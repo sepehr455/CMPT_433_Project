@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <assert.h>
 #include <time.h>
+#include <stdio.h>
 
 #define ENCODER_CHIP  GPIO_CHIP_2
 #define PIN_A         7
@@ -106,6 +107,7 @@ void RotaryEncoder_init(void) {
 }
 
 void RotaryEncoder_cleanup(void) {
+    fprintf(stderr, "Cleaning up rotary encoder...\n");
     if (s_lineA) {
         Gpio_close(s_lineA);
         s_lineA = NULL;

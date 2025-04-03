@@ -7,16 +7,19 @@
 
 class GameServer {
 public:
-    GameServer(int port);
+    explicit GameServer(int port);
     ~GameServer();
 
     void start();
-    Direction getCurrentDirection() const;
+    void stop();
+
+    [[nodiscard]] Direction getCurrentDirection() const;
     int getTurretRotationDelta();
     bool getButtonPressed();
 
+    void sendTankHealth(int health) const;
+    void sendGameOver(const char* message) const;
 
-    void sendTankHealth(int health);
 
 private:
     void receiveInput();
@@ -31,4 +34,5 @@ private:
     std::atomic<Direction> currentDirection;
     std::atomic<int> turretRotationDelta;
     std::atomic<bool> buttonPressed;
+    void registerServerCleanup();
 };

@@ -14,6 +14,7 @@ add_executable(TankBattleServer
         src/GameRender.cpp
         src/GameState.cpp
         src/Enemy.cpp
+        src/Shutdown.cpp
 )
 
 # Include directories

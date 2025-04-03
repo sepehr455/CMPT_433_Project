@@ -1,5 +1,5 @@
 #include "../include/thread_manager.h"
-#include "draw_stuff.h"
+#include "shutdown.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -13,8 +13,7 @@ int main(void) {
         return EXIT_FAILURE;
     }
 
-    // Keep main thread alive while threads work
-    while (1) {
+    while (!is_shutdown_requested()) {
         sleep(1);
     }
 

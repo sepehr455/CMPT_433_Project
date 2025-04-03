@@ -1,13 +1,25 @@
 #include "include/GameServer.h"
 #include "include/GameState.h"
 #include "include/GameRender.h"
+#include "include/Shutdown.h"
 #include <chrono>
 #include <thread>
 #include <iostream>
 #include <mutex>
+#include <csignal>
+#include <atomic>
+
+// Signal handler for graceful shutdown
+void signalHandler(int) {
+    ShutdownModule::requestShutdown();
+}
 
 int main() {
-    // Start the TCP server.
+    // Register signal handlers
+    std::signal(SIGINT, signalHandler);
+    std::signal(SIGTERM, signalHandler);
+
+    // Start the TCP server
     GameServer server(8080);
     server.start();
 
@@ -17,13 +29,19 @@ int main() {
     // Track movement and rotation separately.
     Direction lastDir = Direction::RIGHT;
 
+    // Atomic flag for render thread
+    std::atomic<bool> renderThreadRunning{true};
+
     // Launch rendering in a separate thread.
     std::thread renderThread([&]() {
-        renderer.run(gameState, lastDir);
+        renderer.run(gameState, lastDir, renderThreadRunning);
     });
 
-    // Main game loop (~60 FPS).
-    while (true) {
+    // Main game loop (~60 FPS)
+    bool gameOverNotified = false;
+    auto gameOverStart = std::chrono::steady_clock::time_point();
+
+    while (!ShutdownModule::isShutdownRequested()) {
         auto frameStart = std::chrono::steady_clock::now();
 
         {
@@ -52,20 +70,30 @@ int main() {
             }
 
             // Handle enemy shooting
-            for (const auto& enemy : gameState.getEnemies()) {
+            for (const auto &enemy: gameState.getEnemies()) {
                 if (enemy->canShoot() && enemy->isActive()) {
                     float angle;
                     switch (enemy->getDirection()) {
-                        case Direction::UP: angle = 0.0f; break;
-                        case Direction::RIGHT: angle = 90.0f; break;
-                        case Direction::DOWN: angle = 180.0f; break;
-                        case Direction::LEFT: angle = 270.0f; break;
-                        default: angle = 0.0f; break;
+                        case Direction::UP:
+                            angle = 0.0f;
+                            break;
+                        case Direction::RIGHT:
+                            angle = 90.0f;
+                            break;
+                        case Direction::DOWN:
+                            angle = 180.0f;
+                            break;
+                        case Direction::LEFT:
+                            angle = 270.0f;
+                            break;
+                        default:
+                            angle = 0.0f;
+                            break;
                     }
                     gameState.enemyFireProjectile(
-                        enemy->getPosition().x,
-                        enemy->getPosition().y,
-                        angle
+                            enemy->getPosition().x,
+                            enemy->getPosition().y,
+                            angle
                     );
                     enemy->resetShootTimer();
                 }
@@ -73,8 +101,24 @@ int main() {
 
             gameState.updateProjectiles();
 
-            // Send tank health to client after collisions are processed
-            server.sendTankHealth(gameState.getTank().health);
+            // Game Over Logic
+            if (!gameState.isPlayerAlive() && !gameOverNotified) {
+                gameOverNotified = true;
+                server.sendGameOver("GAME_OVER\n");
+                gameOverStart = std::chrono::steady_clock::now();
+            } else if (gameState.isPlayerAlive()) {
+                // Only send health updates if player is alive
+                server.sendTankHealth(gameState.getTank().health);
+            }
+        }
+
+        // If we have notified game over, wait 5 seconds, then shut down.
+        if (gameOverNotified) {
+            auto now = std::chrono::steady_clock::now();
+            auto secs = std::chrono::duration_cast<std::chrono::seconds>(now - gameOverStart).count();
+            if (secs >= 5) {
+                ShutdownModule::requestShutdown();
+            }
         }
 
         auto frameEnd = std::chrono::steady_clock::now();
@@ -84,6 +128,16 @@ int main() {
         }
     }
 
-    renderThread.join();
+    // Cleanup
+    renderThreadRunning = false;
+    try {
+        if (renderThread.joinable()) {
+            renderThread.join();
+        }
+    } catch (const std::exception &e) {
+        std::cerr << "Error joining render thread: " << e.what() << std::endl;
+    }
+
+    std::cout << "Server shutdown complete" << std::endl;
     return 0;
 }

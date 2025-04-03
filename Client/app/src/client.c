@@ -53,6 +53,7 @@ void close_client_socket_fd (void) {
 
 
 void cleanup_client(void) {
+    printf("Cleaning up client socket\n");
     if (sock_fd != -1) {
         close(sock_fd);
         sock_fd = -1;
