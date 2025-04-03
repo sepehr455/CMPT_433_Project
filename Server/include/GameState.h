@@ -1,4 +1,5 @@
 #pragma once
+
 #include "Direction.h"
 #include "Tank.h"
 #include "Enemy.h"
@@ -20,25 +21,40 @@ struct Projectile {
 class GameState {
 public:
     GameState();
+
     void updateTankPosition(Direction dir);
+
     void updateTurretRotation(int delta);
+
     void fireProjectile();
+
     void enemyFireProjectile(float x, float y, float angle);
+
     void updateProjectiles();
+
     void spawnEnemies();
+
     void checkProjectileCollisions();
+
     void checkTankHit();
 
-    const Tank& getTank() const;
+    const Tank &getTank() const;
+
     float getTurretAngle() const;
-    const std::vector<Projectile>& getProjectiles() const;
-    const std::vector<std::unique_ptr<Enemy>>& getEnemies() const;
+
+    const std::vector<Projectile> &getProjectiles() const;
+
+    const std::vector<std::unique_ptr<Enemy>> &getEnemies() const;
+
     bool isPlayerAlive() const;
+
     float getTankHitEffect() const;
 
-    std::recursive_mutex& getMutex() { return mtx; }
+    std::recursive_mutex &getMutex() { return mtx; }
 
-    void setServer(GameServer* srv);
+    void setServer(GameServer *srv);
+
+    int getCurrentWave() const { return currentWave; }
 
 private:
     Tank tank;
@@ -55,5 +71,10 @@ private:
     static constexpr float ENEMY_SHOOT_INTERVAL = 3.0f;
     static constexpr float HIT_EFFECT_DURATION = 0.5f;
 
-    GameServer* server = nullptr;
+
+    int currentWave;
+    int enemiesKilledThisWave;
+    static constexpr int WAVES_FOR_ENEMY_INCREASE = 5;
+
+    GameServer *server = nullptr;
 };

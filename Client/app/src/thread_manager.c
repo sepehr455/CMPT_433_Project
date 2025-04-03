@@ -211,8 +211,6 @@ static void *receive_thread_func(void *arg) {
             // Split messages by newline in case multiple came in
             char *message = strtok(recv_buf, "\n");
             while (message != NULL) {
-                printf("Received: %s\n", message);
-
                 if (strncmp(message, "HP:", 3) == 0) {
                     s_tank_health = atoi(message + 3);
                 } else if (strcmp(message, "HIT") == 0) {

@@ -29,4 +29,8 @@ private:
     sf::Font gameOverFont;
     sf::Text gameOverText;
     sf::RectangleShape overlay;
+
+    // For wave display
+    sf::Text waveText;
+    sf::Font waveFont;
 };

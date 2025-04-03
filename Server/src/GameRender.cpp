@@ -77,6 +77,16 @@ GameRender::GameRender()
     gameOverText.setFillColor(sf::Color::Red);
     gameOverText.setString("GAME OVER");
 
+    // For Wave Text
+    if (!waveFont.loadFromFile("Assets/arial.ttf")) {
+        std::cerr << "Failed to load font for wave text" << std::endl;
+    }
+    waveText.setFont(waveFont);
+    waveText.setCharacterSize(30);
+    waveText.setFillColor(sf::Color::White);
+    waveText.setOutlineColor(sf::Color::Black);
+    waveText.setOutlineThickness(2.f);
+
     overlay.setSize(sf::Vector2f(1024.f, 768.f));
     overlay.setFillColor(sf::Color(0, 0, 0, 128));
 }
@@ -150,12 +160,21 @@ void GameRender::run(GameState &state, Direction &lastDir, std::atomic<bool>& ru
             }
         }
 
+        // Draw UI elements (after game objects)
+        if (state.isPlayerAlive()) {
+            waveText.setString("Wave: " + std::to_string(state.getCurrentWave()));
+            sf::FloatRect textRect = waveText.getLocalBounds();
+            waveText.setOrigin(textRect.width / 2.0f, textRect.height / 2.0f);
+            waveText.setPosition(1024.f / 2.0f, 30.f);
+            window.draw(waveText);
+        }
+
         if (!state.isPlayerAlive()) {
             // Draw a semi-transparent overlay
             overlay.setPosition(0.f, 0.f);
             window.draw(overlay);
 
-            // Center the "GAME OVER" text
+            gameOverText.setString("GAME OVER\nWave: " + std::to_string(state.getCurrentWave()));
             sf::FloatRect textRect = gameOverText.getLocalBounds();
             gameOverText.setOrigin(textRect.width / 2.0f, textRect.height / 2.0f);
             gameOverText.setPosition(1024.f / 2.0f, 768.f / 2.0f);

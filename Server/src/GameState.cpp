@@ -13,7 +13,9 @@ GameState::GameState()
           yDist(100.0f, 668.0f),
           enemyShootTimer(0.0f),
           tankHitEffectTimer(0.0f),
-          playerAlive(true) {
+          playerAlive(true),
+          currentWave(0),
+          enemiesKilledThisWave(0) {
     spawnEnemies();
 }
 
@@ -100,7 +102,12 @@ void GameState::spawnEnemies() {
                                });
 
     if (allDead || enemies.empty()) {
-        std::uniform_int_distribution<int> countDist(1, 5);
+        // Calculate min/max enemies based on wave
+        int baseEnemies = 1 + (currentWave / WAVES_FOR_ENEMY_INCREASE);
+        int minEnemies = baseEnemies;
+        int maxEnemies = baseEnemies + 4;
+
+        std::uniform_int_distribution<int> countDist(minEnemies, maxEnemies);
         int enemyCount = countDist(rng);
 
         for (int i = 0; i < enemyCount; i++) {
@@ -108,6 +115,8 @@ void GameState::spawnEnemies() {
             float y = yDist(rng);
             enemies.push_back(std::make_unique<Enemy>(x, y));
         }
+
+        enemiesKilledThisWave = 0;
     }
 }
 
@@ -124,6 +133,7 @@ void GameState::checkProjectileCollisions() {
                     if (distance < enemy->getRadius()) {
                         enemy->hit();
                         hit = true;
+                        enemiesKilledThisWave++;
                         break;
                     }
                 }
@@ -145,8 +155,12 @@ void GameState::checkProjectileCollisions() {
             enemies.end());
 
     // Check if we should spawn new enemies
-    spawnEnemies();
+    if (enemies.empty()) {
+        currentWave++;
+        spawnEnemies();
+    }
 }
+
 
 void GameState::checkTankHit() {
     std::lock_guard<std::recursive_mutex> lock(mtx);
