@@ -72,7 +72,7 @@ sf::Vector2f Enemy::getPosition() const {
     return position;
 }
 
-float Enemy::getRadius() const {
+float Enemy::getRadius() {
     return RADIUS;
 }
 

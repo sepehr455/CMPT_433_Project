@@ -10,6 +10,7 @@ public:
     explicit GameServer(int port);
     ~GameServer();
 
+    // Start and stop functions for server
     void start();
     void stop();
 

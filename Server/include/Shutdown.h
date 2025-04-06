@@ -5,6 +5,10 @@
 #include <functional>
 #include <vector>
 
+/**
+ * Simple module for handling the shutdown
+ */
+
 class ShutdownModule {
 public:
     static void requestShutdown();

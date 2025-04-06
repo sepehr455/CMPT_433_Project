@@ -130,20 +130,19 @@ void GameServer::processInputToken(const std::string& token) {
     }
 }
 
-// Send tank health to client
+// Sends the tank's current health to the client
 void GameServer::sendTankHealth(int health) const {
     if (client_fd > 0) {
         char buffer[16];
         snprintf(buffer, sizeof(buffer), "HP:%d\n", health);
 
-        // If send fails, this simply prints an error.
         if (send(client_fd, buffer, strlen(buffer), 0) == -1) {
             perror("Failed to send tank health");
         }
     }
 }
 
-
+// Sends a game over message to the client
 void GameServer::sendGameOver(const char* message) const {
     if (client_fd > 0) {
         if (send(client_fd, message, strlen(message), 0) == -1) {
@@ -152,6 +151,7 @@ void GameServer::sendGameOver(const char* message) const {
     }
 }
 
+// Sends a hit notification to the client
 void GameServer::sendHitMessage() const {
     if (client_fd > 0) {
         const char* message = "HIT\n";
@@ -161,6 +161,7 @@ void GameServer::sendHitMessage() const {
     }
 }
 
+// Gracefully shuts down and closes both server and client sockets
 void GameServer::stop() {
     if (client_fd > 0) {
         shutdown(client_fd, SHUT_RDWR);
@@ -175,6 +176,7 @@ void GameServer::stop() {
     std::cout << "Server stopped" << std::endl;
 }
 
+// Registers a cleanup handler with the shutdown module
 void GameServer::registerServerCleanup() {
     ShutdownModule::registerCleanupHandler([this]() {
         std::cout << "Cleaning up server resources..." << std::endl;
