@@ -13,11 +13,17 @@
 #include <sys/socket.h>
 #include <string.h>
 
+#include "../include/accelerometer.h"
+#include <time.h>
+
 static pthread_t s_joystick_thread;
 static pthread_t s_rotary_thread;
 static pthread_t s_transmit_thread;
 static pthread_t s_receive_thread;
 static pthread_t s_lcd_thread;
+
+static pthread_t s_accelerometer_thread;
+static atomic_bool s_newCheatRequest = false;
 
 // Flags
 static atomic_bool s_running = false;
@@ -96,6 +102,96 @@ static void *rotary_thread_func(void *arg) {
     return NULL;
 }
 
+// Logic for the accelerometer cheat
+typedef enum {
+    TILT_FLAT,
+    TILT_DOWN,
+    TILT_UP,
+    TILT_LEFT,
+    TILT_RIGHT
+} TiltDirection;
+
+static TiltDirection getTiltDirectionFromAccelerometer(void) {
+    float x_tilt, y_tilt;
+    Accelerometer_getTiltDirection(&x_tilt, &y_tilt);
+
+    const float TILT_THRESHOLD = 0.5f;
+
+    if (x_tilt < -TILT_THRESHOLD) {
+        return TILT_DOWN;
+    } else if (x_tilt > TILT_THRESHOLD) {
+        return TILT_UP;
+    } else if (y_tilt > TILT_THRESHOLD) {
+        return TILT_RIGHT;
+    } else if (y_tilt < -TILT_THRESHOLD) {
+        return TILT_LEFT;
+    } else {
+        return TILT_FLAT;
+    }
+}
+
+// New cheat sequence: DOWN → FLAT → LEFT → FLAT → RIGHT → FLAT
+static const TiltDirection CHEAT_SEQUENCE[] = {
+        TILT_DOWN, TILT_FLAT, TILT_LEFT, TILT_FLAT, TILT_RIGHT, TILT_FLAT
+};
+static const int CHEAT_SEQUENCE_LENGTH = 6;
+static const double CHEAT_TIMEOUT_SECONDS = 5.0;
+
+static void *accelerometer_thread_func(void *arg) {
+    (void) arg;
+
+    int cheatIndex = 0;
+    bool inCheatSequence = false;
+    struct timespec startTime;
+
+    while (s_running && !is_shutdown_requested()) {
+        TiltDirection currentTilt = getTiltDirectionFromAccelerometer();
+
+        if (!inCheatSequence) {
+            if (currentTilt == CHEAT_SEQUENCE[0]) {
+                inCheatSequence = true;
+                cheatIndex = 1;
+                clock_gettime(CLOCK_MONOTONIC, &startTime);
+                printf("[ACCEL] Cheat sequence started. Step 1/%d matched.\n",
+                       CHEAT_SEQUENCE_LENGTH);
+            }
+        } else {
+            struct timespec now;
+            clock_gettime(CLOCK_MONOTONIC, &now);
+            double elapsed = (now.tv_sec - startTime.tv_sec)
+                             + (now.tv_nsec - startTime.tv_nsec) / 1e9;
+
+            if (elapsed > CHEAT_TIMEOUT_SECONDS) {
+                inCheatSequence = false;
+                cheatIndex = 0;
+                printf("[ACCEL] Cheat sequence timed out (>%.1f s). Resetting.\n",
+                       CHEAT_TIMEOUT_SECONDS);
+            } else {
+                if (currentTilt == CHEAT_SEQUENCE[cheatIndex]) {
+                    cheatIndex++;
+                    printf("[ACCEL] Cheat step %d/%d matched.\n",
+                           cheatIndex, CHEAT_SEQUENCE_LENGTH);
+
+                    if (cheatIndex == CHEAT_SEQUENCE_LENGTH) {
+                        if (elapsed <= CHEAT_TIMEOUT_SECONDS) {
+                            pthread_mutex_lock(&s_data_mutex);
+                            s_newCheatRequest = true;
+                            pthread_mutex_unlock(&s_data_mutex);
+                            printf("[ACCEL] Cheat code recognized! Will send \"CHEAT\".\n");
+                        }
+                        inCheatSequence = false;
+                        cheatIndex = 0;
+                    }
+                }
+            }
+        }
+
+        usleep(200000);
+    }
+    return NULL;
+}
+// ----------------------------------------------------------------------
+
 static void *transmit_thread_func(void *arg) {
     (void) arg;
     while (s_running && !is_shutdown_requested()) {
@@ -161,6 +257,34 @@ static void *transmit_thread_func(void *arg) {
 
             if (!send_success) {
                 s_client_connected = false;
+            }
+
+            if (s_client_connected) {
+                bool localCheat = false;
+                pthread_mutex_lock(&s_data_mutex);
+                localCheat = s_newCheatRequest;
+                if (localCheat) {
+                    s_newCheatRequest = false;
+                }
+                pthread_mutex_unlock(&s_data_mutex);
+
+                if (localCheat) {
+                    retry_count = 0;
+                    send_success = false;
+                    while (retry_count < 3 && !send_success && s_client_connected) {
+                        if (send(get_client_socket_fd(), "CHEAT", 5, MSG_NOSIGNAL) > 0) {
+                            send_success = true;
+                            printf("[ACCEL] Cheat code sent to server.\n");
+                        } else {
+                            perror("Failed to send cheat code");
+                            retry_count++;
+                            usleep(50000);
+                        }
+                    }
+                    if (!send_success) {
+                        s_client_connected = false;
+                    }
+                }
             }
         } else {
             // Attempt to reconnect using stored IP/port
@@ -263,7 +387,10 @@ bool init_thread_manager(const char *server_ip, int port) {
     SoundEffects_init();
     init_LEDs();
 
-    // Initialize client connection
+    if (!Accelerometer_init()) {
+        fprintf(stderr, "Warning: Accelerometer init failed. Cheat code will be unavailable.\n");
+    }
+
     s_client_connected = init_client(s_server_ip, s_server_port);
     if (s_client_connected) {
         send_initial_state(get_client_socket_fd());
@@ -302,9 +429,16 @@ bool init_thread_manager(const char *server_ip, int port) {
         goto error_cleanup_receive;
     }
 
+    if (pthread_create(&s_accelerometer_thread, NULL, accelerometer_thread_func, NULL) != 0) {
+        perror("Failed to create accelerometer thread");
+        goto error_cleanup_lcd;
+    }
+
     return true;
 
-    // Error handling
+    error_cleanup_lcd:
+    pthread_cancel(s_lcd_thread);
+    pthread_join(s_lcd_thread, NULL);
 
     error_cleanup_receive:
     pthread_cancel(s_receive_thread);
@@ -342,6 +476,7 @@ void cleanup_thread_manager(void) {
     pthread_join(s_transmit_thread, NULL);
     pthread_join(s_receive_thread, NULL);
     pthread_join(s_lcd_thread, NULL);
+    pthread_join(s_accelerometer_thread, NULL);
 
     // Cleanup modules
     cleanup_joystick();
@@ -352,4 +487,5 @@ void cleanup_thread_manager(void) {
     SoundEffects_cleanup();
     cleanup_client();
     cleanup_LEDs();
+    Accelerometer_cleanup();
 }

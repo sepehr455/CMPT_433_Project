@@ -215,6 +215,17 @@ void GameState::checkTankHit() {
     }
 }
 
+void GameState::restoreTankHealth() {
+    std::lock_guard<std::recursive_mutex> lock(mtx);
+    if (!playerAlive) return;
+
+    tank.health = 3;
+    if (server) {
+        server->sendTankHealth(tank.health);
+    }
+}
+
+
 // Simple getters
 const Tank &GameState::getTank() const { return tank; }
 

@@ -1,10 +1,12 @@
 #include "../include/GameServer.h"
+#include "../include/GameState.h"
 #include "Shutdown.h"
 #include <cstring>
 #include <arpa/inet.h>
 #include <thread>
 #include <iostream>
 #include <unistd.h>
+
 
 GameServer::GameServer(int port) :
         currentDirection(Direction::NONE),
@@ -128,7 +130,14 @@ void GameServer::processInputToken(const std::string& token) {
     else if (token.find("BTN:") == 0) {
         buttonPressed = (token.substr(4) == "1");
     }
+    else if (token == "CHEAT") {
+        if (gameState) {
+            gameState->restoreTankHealth();
+        }
+
+    }
 }
+
 
 // Sends the tank's current health to the client
 void GameServer::sendTankHealth(int health) const {
@@ -182,4 +191,8 @@ void GameServer::registerServerCleanup() {
         std::cout << "Cleaning up server resources..." << std::endl;
         this->stop();
     });
+}
+
+void GameServer::setGameState(GameState* gs) {
+    gameState = gs;
 }

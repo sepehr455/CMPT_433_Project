@@ -52,6 +52,9 @@ public:
     // Link to server for feedback (e.g., hit messages)
     void setServer(GameServer* srv);
 
+    void restoreTankHealth();
+
+
 private:
     Tank tank;
     float turretAngle;

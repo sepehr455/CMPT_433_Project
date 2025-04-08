@@ -5,6 +5,9 @@
 #include <netinet/in.h>
 #include <atomic>
 
+// Forward declaration to avoid circular include
+class GameState;
+
 class GameServer {
 public:
     explicit GameServer(int port);
@@ -22,10 +25,13 @@ public:
     void sendGameOver(const char* message) const;
     void sendHitMessage() const;
 
+    // Link to the GameState to allow invoking actions like cheats
+    void setGameState(GameState* gs);
 
 private:
     void receiveInput();
     void processInputToken(const std::string& token);
+    void registerServerCleanup();
 
     int server_fd;
     int client_fd;
@@ -36,5 +42,5 @@ private:
     std::atomic<Direction> currentDirection;
     std::atomic<int> turretRotationDelta;
     std::atomic<bool> buttonPressed;
-    void registerServerCleanup();
+    GameState* gameState = nullptr;
 };
