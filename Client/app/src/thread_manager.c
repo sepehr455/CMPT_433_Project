@@ -41,10 +41,6 @@ static pthread_mutex_t s_data_mutex = PTHREAD_MUTEX_INITIALIZER;
 // store tank health from the server.
 static atomic_int s_tank_health = 3;
 
-// Forward declarations
-static void send_initial_state(int sock_fd);
-
-// Initial State Sender
 static void send_initial_state(int sock_fd) {
     char buffer[32] = "NONE";
 
@@ -137,6 +133,7 @@ static const TiltDirection CHEAT_SEQUENCE[] = {
 static const int CHEAT_SEQUENCE_LENGTH = 6;
 static const double CHEAT_TIMEOUT_SECONDS = 5.0;
 
+
 static void *accelerometer_thread_func(void *arg) {
     (void) arg;
 
@@ -152,8 +149,7 @@ static void *accelerometer_thread_func(void *arg) {
                 inCheatSequence = true;
                 cheatIndex = 1;
                 clock_gettime(CLOCK_MONOTONIC, &startTime);
-                printf("[ACCEL] Cheat sequence started. Step 1/%d matched.\n",
-                       CHEAT_SEQUENCE_LENGTH);
+                printf("[ACCEL] Cheat sequence started. Step 1/%d matched.\n", CHEAT_SEQUENCE_LENGTH);
             }
         } else {
             struct timespec now;
@@ -164,25 +160,23 @@ static void *accelerometer_thread_func(void *arg) {
             if (elapsed > CHEAT_TIMEOUT_SECONDS) {
                 inCheatSequence = false;
                 cheatIndex = 0;
-                printf("[ACCEL] Cheat sequence timed out (>%.1f s). Resetting.\n",
-                       CHEAT_TIMEOUT_SECONDS);
-            } else {
-                if (currentTilt == CHEAT_SEQUENCE[cheatIndex]) {
-                    cheatIndex++;
-                    printf("[ACCEL] Cheat step %d/%d matched.\n",
-                           cheatIndex, CHEAT_SEQUENCE_LENGTH);
-
-                    if (cheatIndex == CHEAT_SEQUENCE_LENGTH) {
-                        if (elapsed <= CHEAT_TIMEOUT_SECONDS) {
-                            pthread_mutex_lock(&s_data_mutex);
-                            s_newCheatRequest = true;
-                            pthread_mutex_unlock(&s_data_mutex);
-                            printf("[ACCEL] Cheat code recognized! Will send \"CHEAT\".\n");
-                        }
-                        inCheatSequence = false;
-                        cheatIndex = 0;
-                    }
+                printf("[ACCEL] Cheat sequence timed out (>%.1f s). Resetting.\n", CHEAT_TIMEOUT_SECONDS);
+            } else if (currentTilt == CHEAT_SEQUENCE[cheatIndex]) {
+                cheatIndex++;
+                printf("[ACCEL] Cheat step %d/%d matched.\n", cheatIndex, CHEAT_SEQUENCE_LENGTH);
+                if (cheatIndex == CHEAT_SEQUENCE_LENGTH) {
+                    pthread_mutex_lock(&s_data_mutex);
+                    s_newCheatRequest = true;
+                    pthread_mutex_unlock(&s_data_mutex);
+                    printf("[ACCEL] Cheat code recognized! Will send \"CHEAT\".\n");
+                    flash_LED(GREEN, 5, 500);
+                    inCheatSequence = false;
+                    cheatIndex = 0;
                 }
+            } else if (currentTilt != CHEAT_SEQUENCE[cheatIndex - 1]) {
+                inCheatSequence = false;
+                cheatIndex = 0;
+                printf("[ACCEL] Cheat step mismatch. Sequence reset.\n");
             }
         }
 
@@ -190,7 +184,6 @@ static void *accelerometer_thread_func(void *arg) {
     }
     return NULL;
 }
-// ----------------------------------------------------------------------
 
 static void *transmit_thread_func(void *arg) {
     (void) arg;
