@@ -11,7 +11,7 @@
 
 static snd_pcm_t *handle;
 
-#define DEFAULT_VOLUME 40
+#define DEFAULT_VOLUME 65
 
 #define SAMPLE_RATE 44100
 #define NUM_CHANNELS 1
