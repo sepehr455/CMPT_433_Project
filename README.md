@@ -1,4 +1,4 @@
-# CMPT_433_Project
+# Beagle Blitz
 Repository for CMPT 433 Term Project
 
 ### Description:
